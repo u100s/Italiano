@@ -13,6 +13,11 @@
       background: #0b0f1a;
       height: 100%;
       overflow: hidden;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      touch-action: none; /* гасим жесты браузера внутри canvas */
       font-family: 'Nunito', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     }
     canvas { display: block; }
@@ -29,35 +34,20 @@
     theme: {
       bgTop: '#0b0f1a',
       bgBottom: '#131b2e',
-      accent: '#FF4D4D',     // Italian red
-      accent2: '#2ECC71',    // basil green
-      accent3: '#F8E16C',    // cheese yellow
+      accent: '#FF4D4D',
+      accent2: '#2ECC71',
+      accent3: '#F8E16C',
       white: '#F5F7FB',
       muted: '#9aa6c1',
       panel: 'rgba(255,255,255,0.06)',
       panelStrong: 'rgba(255,255,255,0.12)',
       shadow: 'rgba(0,0,0,0.25)',
     },
-    grid: {
-      cols: 24,
-      rows: 16,
-      speedMs: 120,
-    },
+    grid: { cols: 24, rows: 16, speedMs: 120 },
     quizOptions: 4,
     masteryThreshold: 5,
-    xp: {
-      flashKnow: 10,
-      quizCorrect: 15,
-      pizza: 5,
-      gameStep: 0,
-    },
-    voice: {
-      it: 'it-IT',
-      ru: 'ru-RU',
-      rate: 1.0,
-      pitch: 1.0,
-      volume: 1.0,
-    },
+    xp: { flashKnow: 10, quizCorrect: 15, pizza: 5, gameStep: 0 },
+    voice: { it: 'it-IT', ru: 'ru-RU', rate: 1.0, pitch: 1.0, volume: 1.0 },
   };
 
   // ========= Canvas Setup =========
@@ -65,26 +55,24 @@
   const ctx = canvas.getContext('2d');
   let DPR = Math.max(1, window.devicePixelRatio || 1);
   let W = 0, H = 0;
-  const resize = () => {
+  function resize() {
     W = window.innerWidth; H = window.innerHeight;
     canvas.width = Math.floor(W * DPR);
     canvas.height = Math.floor(H * DPR);
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  };
-  window.addEventListener('resize', resize);
-  resize();
+  }
+
+  // ========= Device detection =========
+  const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
   // ========= Utilities =========
   const rand = (a, b) => Math.random() * (b - a) + a;
   const randInt = (a, b) => Math.floor(rand(a, b + 1));
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
   const now = () => performance.now();
-
-  function lerp(a, b, t) { return a + (b - a) * t; }
   function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
-
   function todayKey() {
     const d = new Date();
     const y = d.getFullYear();
@@ -93,7 +81,7 @@
     return `${y}-${m}-${day}`;
   }
 
-  // ========= Data: Words (Italian -> Russian) =========
+  // ========= Data: Words =========
   const WORDS = [
     {it:'ciao', ru:'привет', cat:'Базовые'}, {it:'buongiorno', ru:'доброе утро', cat:'Базовые'},
     {it:'buonasera', ru:'добрый вечер', cat:'Базовые'}, {it:'arrivederci', ru:'до свидания', cat:'Базовые'},
@@ -104,33 +92,27 @@
     {it:'così così', ru:'так себе', cat:'Базовые'}, {it:'sì', ru:'да', cat:'Базовые'},
     {it:'no', ru:'нет', cat:'Базовые'}, {it:'capisco', ru:'понимаю', cat:'Базовые'},
     {it:'non capisco', ru:'не понимаю', cat:'Базовые'}, {it:'parli inglese?', ru:'вы говорите по-английски?', cat:'Базовые'},
-
     {it:'acqua', ru:'вода', cat:'Еда'}, {it:'pane', ru:'хлеб', cat:'Еда'},
     {it:'formaggio', ru:'сыр', cat:'Еда'}, {it:'pizza', ru:'пицца', cat:'Еда'},
     {it:'pasta', ru:'паста', cat:'Еда'}, {it:'pomodoro', ru:'помидор', cat:'Еда'},
     {it:'olio', ru:'масло', cat:'Еда'}, {it:'sale', ru:'соль', cat:'Еда'},
     {it:'zucchero', ru:'сахар', cat:'Еда'}, {it:'gelato', ru:'мороженое', cat:'Еда'},
-
     {it:'stazione', ru:'вокзал', cat:'Путешествия'}, {it:'aeroporto', ru:'аэропорт', cat:'Путешествия'},
     {it:'biglietto', ru:'билет', cat:'Путешествия'}, {it:'bagaglio', ru:'багаж', cat:'Путешествия'},
     {it:'albergo', ru:'отель', cat:'Путешествия'}, {it:'ristorante', ru:'ресторан', cat:'Путешествия'},
     {it:'fermata', ru:'остановка', cat:'Путешествия'}, {it:'mappa', ru:'карта', cat:'Путешествия'},
     {it:'sinistra', ru:'налево', cat:'Путешествия'}, {it:'destra', ru:'направо', cat:'Путешествия'},
-
     {it:'uno', ru:'один', cat:'Числа'}, {it:'due', ru:'два', cat:'Числа'},
     {it:'tre', ru:'три', cat:'Числа'}, {it:'quattro', ru:'четыре', cat:'Числа'},
     {it:'cinque', ru:'пять', cat:'Числа'}, {it:'sei', ru:'шесть', cat:'Числа'},
     {it:'sette', ru:'семь', cat:'Числа'}, {it:'otto', ru:'восемь', cat:'Числа'},
     {it:'nove', ru:'девять', cat:'Числа'}, {it:'dieci', ru:'десять', cat:'Числа'},
-
     {it:'mi chiamo...', ru:'меня зовут...', cat:'Фразы'}, {it:'piacere', ru:'приятно познакомиться', cat:'Фразы'},
     {it:'quanto costa?', ru:'сколько стоит?', cat:'Фразы'}, {it:'dove è il bagno?', ru:'где туалет?', cat:'Фразы'},
     {it:'aiuto!', ru:'помогите!', cat:'Фразы'}, {it:'ho bisogno di...', ru:'мне нужно...', cat:'Фразы'},
-
     {it:'rosso', ru:'красный', cat:'Цвета'}, {it:'verde', ru:'зелёный', cat:'Цвета'},
     {it:'giallo', ru:'жёлтый', cat:'Цвета'}, {it:'blu', ru:'синий', cat:'Цвета'},
     {it:'nero', ru:'чёрный', cat:'Цвета'}, {it:'bianco', ru:'белый', cat:'Цвета'},
-
     {it:'madre', ru:'мать', cat:'Семья'}, {it:'padre', ru:'отец', cat:'Семья'},
     {it:'fratello', ru:'брат', cat:'Семья'}, {it:'sorella', ru:'сестра', cat:'Семья'},
     {it:'figlio', ru:'сын', cat:'Сын'}, {it:'figlia', ru:'дочь', cat:'Семья'},
@@ -149,14 +131,10 @@
     },
     lastOpenDate: todayKey(),
   };
-
   function loadState() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        state = Object.assign(state, parsed);
-      }
+      if (raw) state = Object.assign(state, JSON.parse(raw));
     } catch (_) {}
     ensureTodayBucket();
   }
@@ -170,24 +148,9 @@
     }
     state.lastOpenDate = t;
   }
-  function addXP(n) {
-    ensureTodayBucket();
-    state.daily[todayKey()].xp += n;
-    saveState();
-  }
-  function incDaily(field, n=1) {
-    ensureTodayBucket();
-    state.daily[todayKey()][field] = (state.daily[todayKey()][field] || 0) + n;
-    saveState();
-  }
-  function setHighScore(score) {
-    ensureTodayBucket();
-    const d = state.daily[todayKey()];
-    if (score > (d.gameHighScore || 0)) {
-      d.gameHighScore = score;
-      saveState();
-    }
-  }
+  function addXP(n) { ensureTodayBucket(); state.daily[todayKey()].xp += n; saveState(); }
+  function incDaily(field, n=1) { ensureTodayBucket(); state.daily[todayKey()][field] = (state.daily[todayKey()][field] || 0) + n; saveState(); }
+  function setHighScore(score) { ensureTodayBucket(); const d = state.daily[todayKey()]; if (score > (d.gameHighScore||0)) { d.gameHighScore = score; saveState(); } }
   function streakInfo() {
     const today = todayKey();
     let streak = 0;
@@ -197,7 +160,7 @@
       const k = `${y}-${m}-${d}`;
       const entry = state.daily[k];
       const active = entry && ((entry.flashcardsReviewed||0)+(entry.quizTotal||0)+(entry.pizzasEaten||0)+(entry.xp||0) > 0);
-      if (active) { streak++; } else { break; }
+      if (active) streak++; else break;
       day.setDate(day.getDate()-1);
     }
     const last7 = [];
@@ -211,22 +174,18 @@
     }
     return {streak, last7};
   }
-
   loadState();
 
-  // ========= Speech Synthesis =========
+  // ========= Speech =========
   let voices = [];
   let audioPrimed = false;
-
   function loadVoices() {
     voices = speechSynthesis.getVoices();
     const it = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('it'));
     if (it) state.settings.voiceIt = it.name;
   }
   loadVoices();
-  window.speechSynthesis.onvoiceschanged = () => {
-    loadVoices();
-  };
+  window.speechSynthesis.onvoiceschanged = loadVoices;
 
   function speak(text, {lang=CONFIG.voice.it, rate, pitch, volume, force=false}={}) {
     if (!audioPrimed && !force) return;
@@ -241,7 +200,6 @@
     }
     speechSynthesis.speak(u);
   }
-
   function primeAudio() {
     if (audioPrimed) return;
     audioPrimed = true;
@@ -256,20 +214,19 @@
     justPressed: false,
     justReleased: false,
     keys: {},
-    arrows: {x:0,y:0},
+    touching: false,
+    touchSX: 0, touchSY: 0, touchST: 0,
+    pendingDir: null,
   };
   canvas.addEventListener('mousemove', e => {
     const rect = canvas.getBoundingClientRect();
     input.mouseX = e.clientX - rect.left;
     input.mouseY = e.clientY - rect.top;
   });
-  canvas.addEventListener('mousedown', e => {
-    primeAudio();
-    input.down = true; input.justPressed = true;
-  });
-  canvas.addEventListener('mouseup', e => {
-    input.down = false; input.justReleased = true;
-  });
+  canvas.addEventListener('mousedown', () => { primeAudio(); input.down = true; input.justPressed = true; });
+  canvas.addEventListener('mouseup', () => { input.down = false; input.justReleased = true; });
+
+  // Touch + swipe
   canvas.addEventListener('touchstart', e => {
     primeAudio();
     const t = e.touches[0];
@@ -277,6 +234,7 @@
     input.mouseX = t.clientX - rect.left;
     input.mouseY = t.clientY - rect.top;
     input.down = true; input.justPressed = true;
+    input.touching = true; input.touchSX = input.mouseX; input.touchSY = input.mouseY; input.touchST = now();
     e.preventDefault();
   }, {passive:false});
   canvas.addEventListener('touchmove', e => {
@@ -288,6 +246,16 @@
   }, {passive:false});
   canvas.addEventListener('touchend', e => {
     input.down = false; input.justReleased = true;
+    if (input.touching) {
+      const dx = input.mouseX - input.touchSX;
+      const dy = input.mouseY - input.touchSY;
+      const adx = Math.abs(dx), ady = Math.abs(dy);
+      const dist = Math.hypot(dx, dy);
+      if (dist > 18) {
+        input.pendingDir = (adx > ady) ? (dx > 0 ? 'RIGHT' : 'LEFT') : (dy > 0 ? 'DOWN' : 'UP');
+      }
+    }
+    input.touching = false;
     e.preventDefault();
   }, {passive:false});
 
@@ -295,11 +263,9 @@
     input.keys[e.key] = true;
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
   }, {passive:false});
-  window.addEventListener('keyup', e => {
-    input.keys[e.key] = false;
-  });
+  window.addEventListener('keyup', e => { input.keys[e.key] = false; });
 
-  // ========= UI Elements (Canvas) =========
+  // ========= UI Helpers =========
   function drawRoundedRect(x, y, w, h, r) {
     const rr = Math.min(r, w/2, h/2);
     ctx.beginPath();
@@ -310,7 +276,6 @@
     ctx.arcTo(x, y, x+w, y, rr);
     ctx.closePath();
   }
-
   function drawButton(btn) {
     const {x,y,w,h,label,accent=false,icon=null} = btn;
     const hover = hit(btn, input.mouseX, input.mouseY);
@@ -323,38 +288,28 @@
     ctx.fillStyle = grad;
     drawRoundedRect(x,y,w,h,16);
     ctx.fill();
-    ctx.shadowColor = CONFIG.theme.shadow; ctx.shadowBlur = 12; ctx.shadowOffsetY = 4;
-    ctx.fillStyle = 'transparent';
-    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-
     ctx.fillStyle = CONFIG.theme.white;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = '600 18px Nunito';
-    if (icon) {
-      ctx.font = '600 18px Nunito';
-      ctx.fillText(icon + ' ' + label, x + w/2, y + h/2);
-    } else {
-      ctx.fillText(label, x + w/2, y + h/2);
-    }
+    if (icon) ctx.fillText(icon + ' ' + label, x + w/2, y + h/2);
+    else ctx.fillText(label, x + w/2, y + h/2);
   }
-
   function buttonClicked(btn) {
     btn._hover = hit(btn, input.mouseX, input.mouseY);
-    if (btn._hover && input.justReleased) return true;
-    return false;
+    return btn._hover && input.justReleased;
   }
-
   function hit(r, mx, my) {
     return mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h;
   }
 
-  // ========= Background Particles (Theme) =========
+  // ========= Background (floaters) =========
   const floaters = [];
   const FLOATER_ICONS = ['🍕','🍅','🍦','🧀','🍝','🍇'];
   function initFloaters() {
     floaters.length = 0;
-    const n = Math.floor((W*H)/60000) + 12;
+    const densityReducer = isTouch ? 1.6 : 1.0;
+    const n = Math.floor((W*H)/(60000*densityReducer)) + 10;
     for (let i=0; i<n; i++) {
       floaters.push({
         x: rand(0, W), y: rand(0, H),
@@ -367,8 +322,6 @@
       });
     }
   }
-  initFloaters();
-
   function drawBackground(t) {
     const g = ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0, CONFIG.theme.bgTop);
@@ -408,20 +361,19 @@
     ctx.fillStyle = CONFIG.theme.white;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.font = '800 26px Nunito';
-    ctx.fillText('La Dolce Vita', 24, 18);
+    ctx.font = '800 24px Nunito';
+    ctx.fillText('La Dolce Vita', 20, 16);
 
     ctx.globalAlpha = 0.7;
-    ctx.font = '600 14px Nunito';
+    ctx.font = '600 13px Nunito';
     ctx.fillStyle = CONFIG.theme.muted;
-    ctx.fillText('Итальянский с улыбкой — играй и учись!', 24, 48);
+    ctx.fillText('Итальянский с улыбкой — играй и учись!', 20, 42);
     ctx.globalAlpha = 1;
   }
 
-  // ========= Scene Management =========
+  // ========= Scenes =========
   const SCENES = { MENU:'MENU', FLASH:'FLASH', QUIZ:'QUIZ', GAME:'GAME', PROGRESS:'PROGRESS' };
   let currentScene = SCENES.MENU;
-
   function goto(scene) {
     currentScene = scene;
     if (scene === SCENES.GAME) gameInit();
@@ -429,7 +381,7 @@
     if (scene === SCENES.QUIZ) quizInit();
   }
 
-  // ========= Word Helpers =========
+  // ========= Word helpers =========
   function getWordProgress(it) {
     if (!state.wordsProgress[it]) state.wordsProgress[it] = {seen:0, correct:0, mastered:false, lastSeen:null};
     return state.wordsProgress[it];
@@ -459,7 +411,6 @@
   let flashQueue = [];
   let flashCurrent = null;
   let flashFlipped = false;
-
   function flashInit() {
     const pool = WORDS.slice();
     pool.sort((a,b) => {
@@ -471,21 +422,16 @@
     flashQueue = shuffle(pool.slice(0, 24));
     nextFlash();
   }
-
   function nextFlash() {
     flashFlipped = false;
-    if (flashQueue.length === 0) {
-      flashInit();
-      return;
-    }
+    if (flashQueue.length === 0) { flashInit(); return; }
     flashCurrent = flashQueue.shift();
     markSeen(flashCurrent);
   }
-
   function drawFlash() {
-    const cardW = Math.min(520, W*0.8);
-    const cardH = Math.min(320, H*0.5);
-    const x = (W-cardW)/2, y = (H-cardH)/2 - 20;
+    const cardW = Math.min(520, W*0.9);
+    const cardH = Math.min(320, H*0.52);
+    const x = (W-cardW)/2, y = (H-cardH)/2 - 10;
 
     ctx.fillStyle = CONFIG.theme.panel;
     drawRoundedRect(x, y, cardW, cardH, 24);
@@ -494,20 +440,20 @@
     ctx.font = '600 14px Nunito';
     ctx.fillStyle = CONFIG.theme.muted;
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText(flashCurrent.cat || 'Слова', x+20, y+16);
+    ctx.fillText(flashCurrent.cat || 'Слова', x+20, y+14);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = CONFIG.theme.white;
-    ctx.font = '800 48px Nunito';
+    ctx.font = '800 42px Nunito';
     ctx.fillText(flashCurrent.it, x + cardW/2, y + cardH/2 - 12);
 
-    ctx.font = '600 24px Nunito';
+    ctx.font = '600 22px Nunito';
     ctx.fillStyle = flashFlipped ? CONFIG.theme.accent3 : 'rgba(255,255,255,0.18)';
-    ctx.fillText(flashFlipped ? flashCurrent.ru : 'нажмите, чтобы открыть перевод', x + cardW/2, y + cardH/2 + 36);
+    ctx.fillText(flashFlipped ? flashCurrent.ru : 'нажмите, чтобы открыть перевод', x + cardW/2, y + cardH/2 + 34);
 
-    const btnW = 160, btnH = 48, gap = 24;
-    const bY = y + cardH + 24;
+    const btnW = 150, btnH = 46, gap = 18;
+    const bY = y + cardH + 18;
     const b1 = {x: x + cardW/2 - btnW - gap/2, y: bY, w: btnW, h: btnH, label:'Ещё', icon:'🔁'};
     const b2 = {x: x + cardW/2 + gap/2, y: bY, w: btnW, h: btnH, label:'Знаю', icon:'✅', accent:true};
     const bSound = {x: x + cardW - 56, y: y + 8, w: 40, h: 40, label:'🔊', accent:false};
@@ -519,9 +465,7 @@
       flashFlipped = !flashFlipped;
       if (flashFlipped) speak(flashCurrent.it, {lang: CONFIG.voice.it});
     }
-    if (buttonClicked(bSound)) {
-      speak(flashCurrent.it, {lang: CONFIG.voice.it});
-    }
+    if (buttonClicked(bSound)) speak(flashCurrent.it, {lang: CONFIG.voice.it});
     if (buttonClicked(b1)) {
       flashQueue.push(flashCurrent);
       incDaily('flashcardsReviewed', 1);
@@ -540,20 +484,17 @@
   let quizCurrent = null;
   let quizOptions = [];
   let quizFeedback = null;
-  function quizInit() {
-    pickQuiz();
-    quizFeedback = null;
-  }
+  function quizInit() { pickQuiz(); quizFeedback = null; }
   function pickQuiz() {
     const w = WORDS[randInt(0, WORDS.length-1)];
     const wrongs = shuffle(WORDS.filter(x => x.ru !== w.ru)).slice(0, CONFIG.quizOptions-1);
     quizOptions = shuffle([w, ...wrongs]);
     quizCurrent = w;
   }
-  function drawQuiz(t) {
+  function drawQuiz() {
     const panelW = Math.min(640, W*0.9);
-    const panelH = Math.min(480, H*0.7);
-    const x = (W - panelW)/2, y = (H-panelH)/2 - 20;
+    const panelH = Math.min(480, H*0.72);
+    const x = (W - panelW)/2, y = (H-panelH)/2 - 10;
 
     ctx.fillStyle = CONFIG.theme.panel;
     drawRoundedRect(x,y,panelW,panelH,22);
@@ -563,16 +504,16 @@
     ctx.textBaseline = 'top';
     ctx.fillStyle = CONFIG.theme.muted;
     ctx.font = '600 14px Nunito';
-    ctx.fillText('Выберите перевод', x+panelW/2, y+16);
+    ctx.fillText('Выберите перевод', x+panelW/2, y+14);
 
     ctx.fillStyle = CONFIG.theme.white;
-    ctx.font = '800 42px Nunito';
-    ctx.fillText(quizCurrent.it, x+panelW/2, y+70);
+    ctx.font = '800 38px Nunito';
+    ctx.fillText(quizCurrent.it, x+panelW/2, y+68);
 
     const grid = {cols:2, rows:2};
     const btnW = (panelW - 60)/grid.cols;
     const btnH = 64;
-    const startY = y + 160;
+    const startY = y + 150;
     let k = 0;
 
     for (let r=0; r<grid.rows; r++) {
@@ -583,14 +524,12 @@
         const isCorrect = opt.ru === quizCurrent.ru;
         const btn = {x:bx, y:by, w:btnW, h:btnH, label:opt.ru, accent:false};
         let bg = CONFIG.theme.panel;
-        if (quizFeedback && quizFeedback.index === k) {
-          bg = quizFeedback.correct ? CONFIG.theme.accent2 : CONFIG.theme.accent;
-        }
+        if (quizFeedback && quizFeedback.index === k) bg = quizFeedback.correct ? CONFIG.theme.accent2 : CONFIG.theme.accent;
         ctx.fillStyle = bg;
         drawRoundedRect(bx,by,btnW,btnH,14); ctx.fill();
         ctx.fillStyle = CONFIG.theme.white;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.font = '600 20px Nunito';
+        ctx.font = '600 18px Nunito';
         ctx.fillText(opt.ru, bx+btnW/2, by+btnH/2);
 
         if (buttonClicked(btn)) {
@@ -607,7 +546,6 @@
           }
           setTimeout(()=>{ quizFeedback=null; pickQuiz(); }, 700);
         }
-
         k++;
       }
     }
@@ -617,7 +555,7 @@
     if (buttonClicked(bSound)) speak(quizCurrent.it, {lang: CONFIG.voice.it});
   }
 
-  // ========= Game: Mouse & Pizza (Snake) =========
+  // ========= Game: Mouse & Pizza =========
   const DIRS = {UP:{x:0,y:-1}, DOWN:{x:0,y:1}, LEFT:{x:-1,y:0}, RIGHT:{x:1,y:0}};
   let cellSize = 24;
   function calcGrid() {
@@ -631,12 +569,8 @@
   let game = null;
   let wordCycle = shuffle(WORDS.slice());
   let wordIndex = 0;
-
   function nextGameWord() {
-    if (wordIndex >= wordCycle.length) {
-      wordCycle = shuffle(WORDS.slice());
-      wordIndex = 0;
-    }
+    if (wordIndex >= wordCycle.length) { wordCycle = shuffle(WORDS.slice()); wordIndex = 0; }
     return wordCycle[wordIndex++];
   }
 
@@ -651,14 +585,16 @@
       alive: true,
       score: 0,
       pause: false,
-      speakCoolDown: 0,
     };
     const cx = Math.floor(CONFIG.grid.cols/2), cy = Math.floor(CONFIG.grid.rows/2);
     game.body = [{x:cx, y:cy}, {x:cx-1, y:cy}, {x:cx-2, y:cy}];
     spawnPizza();
     game.lastStep = now();
-  }
 
+    if (isTouch) {
+      setTimeout(()=>toasts.push({text:'Свайпы или крестовина для управления', ts: now(), color: CONFIG.theme.accent2}), 400);
+    }
+  }
   function spawnPizza() {
     let p;
     while (true) {
@@ -667,19 +603,24 @@
     }
     game.pizza = p;
   }
-
-  function setDirFromKeys() {
-    if (input.keys['ArrowUp'] && game.dir !== DIRS.DOWN) game.nextDir = DIRS.UP;
-    else if (input.keys['ArrowDown'] && game.dir !== DIRS.UP) game.nextDir = DIRS.DOWN;
-    else if (input.keys['ArrowLeft'] && game.dir !== DIRS.RIGHT) game.nextDir = DIRS.LEFT;
-    else if (input.keys['ArrowRight'] && game.dir !== DIRS.LEFT) game.nextDir = DIRS.RIGHT;
-    if (input.keys['p'] || input.keys['P']) game.pause = !game.pause;
-    if (input.keys['Escape']) goto(SCENES.MENU);
+  function isOpposite(a, b) {
+    return (a.x + b.x === 0 && a.y + b.y === 0);
   }
+  function setDirFromInputs() {
+    if (input.keys['ArrowUp'] && !isOpposite(game.dir, DIRS.UP)) game.nextDir = DIRS.UP;
+    else if (input.keys['ArrowDown'] && !isOpposite(game.dir, DIRS.DOWN)) game.nextDir = DIRS.DOWN;
+    else if (input.keys['ArrowLeft'] && !isOpposite(game.dir, DIRS.LEFT)) game.nextDir = DIRS.LEFT;
+    else if (input.keys['ArrowRight'] && !isOpposite(game.dir, DIRS.RIGHT)) game.nextDir = DIRS.RIGHT;
 
+    if (input.pendingDir) {
+      const m = {UP:DIRS.UP, DOWN:DIRS.DOWN, LEFT:DIRS.LEFT, RIGHT:DIRS.RIGHT}[input.pendingDir];
+      if (m && !isOpposite(game.dir, m)) game.nextDir = m;
+      input.pendingDir = null;
+    }
+  }
   function gameStep() {
     if (!game.alive || game.pause) return;
-    setDirFromKeys();
+    setDirFromInputs();
     game.dir = game.nextDir;
     const head = game.body[0];
     const nx = head.x + game.dir.x, ny = head.y + game.dir.y;
@@ -733,12 +674,14 @@
     const totalW = cellSize * CONFIG.grid.cols;
     const totalH = cellSize * CONFIG.grid.rows;
     gridLeft = (W - totalW)/2;
-    gridTop = (H - totalH)/2 + 16;
+    gridTop = (H - totalH)/2 + 12;
 
+    // Board panel
     ctx.fillStyle = CONFIG.theme.panel;
     drawRoundedRect(gridLeft-16, gridTop-16, totalW+32, totalH+32, 18);
     ctx.fill();
 
+    // grid lines
     ctx.save();
     ctx.globalAlpha = 0.18;
     ctx.strokeStyle = CONFIG.theme.white;
@@ -757,6 +700,7 @@
     }
     ctx.restore();
 
+    // pizza
     const p = game.pizza;
     const px = gridLeft + p.x*cellSize + cellSize/2;
     const py = gridTop + p.y*cellSize + cellSize/2;
@@ -765,57 +709,76 @@
     ctx.translate(px, py);
     ctx.rotate(Math.sin(t*0.002 + (p.x+p.y)) * 0.25);
     ctx.fillStyle = '#d69d6a';
-    ctx.beginPath();
-    ctx.moveTo(0,0);
-    ctx.arc(0,0,pr, -Math.PI/4, Math.PI/4, false);
-    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,pr, -Math.PI/4, Math.PI/4, false); ctx.closePath(); ctx.fill();
     ctx.fillStyle = CONFIG.theme.accent3;
-    ctx.beginPath();
-    ctx.moveTo(0,0);
-    ctx.arc(0,0,pr*0.8, -Math.PI/4, Math.PI/4, false);
-    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,pr*0.8, -Math.PI/4, Math.PI/4, false); ctx.closePath(); ctx.fill();
     ctx.fillStyle = CONFIG.theme.accent;
-    for (let i=0;i<3;i++){
-      const ang = -0.35 + i*0.35;
+    for (let i=0;i<3;i++){ const ang = -0.35 + i*0.35;
       ctx.beginPath(); ctx.arc(Math.cos(ang)*pr*0.45, Math.sin(ang)*pr*0.45, pr*0.12, 0, Math.PI*2); ctx.fill();
     }
     ctx.restore();
 
-    for (let i=game.body.length-1; i>=0; i--) {
-      drawMouseCell(game.body[i].x, game.body[i].y, i);
-    }
+    // mouse
+    for (let i=game.body.length-1; i>=0; i--) drawMouseCell(game.body[i].x, game.body[i].y, i);
 
+    // HUD
     ctx.fillStyle = CONFIG.theme.white;
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.font = '800 22px Nunito';
-    ctx.fillText(`Счёт: ${game.score}`, gridLeft, gridTop - 48);
+    ctx.font = '800 20px Nunito';
+    ctx.fillText(`Счёт: ${game.score}`, gridLeft, gridTop - 44);
 
-    ctx.font = '600 14px Nunito';
+    ctx.font = '600 13px Nunito';
     ctx.fillStyle = CONFIG.theme.muted;
-    ctx.fillText('Управление: ← ↑ → ↓   •   Пауза: P   •   Меню: Esc', gridLeft, gridTop - 24);
+    ctx.fillText(isTouch ? 'Управление: свайпы или крестовина   •   Меню: ⌂   •   Пауза: ⏸' : 'Управление: ← ↑ → ↓   •   Пауза: P   •   Меню: Esc', gridLeft, gridTop - 22);
 
-    if (now() - game.lastStep >= CONFIG.grid.speedMs) {
-      game.lastStep = now();
-      gameStep();
+    // step
+    if (now() - game.lastStep >= CONFIG.grid.speedMs) { game.lastStep = now(); gameStep(); }
+
+    // Top-right small buttons (Pause/Menu)
+    const topBtnSize = 40;
+    const bPause = {x: gridLeft + totalW - topBtnSize*2 - 8, y: gridTop - topBtnSize - 12, w: topBtnSize, h: topBtnSize, label:'⏸', accent:false};
+    const bHome  = {x: gridLeft + totalW - topBtnSize - 4, y: gridTop - topBtnSize - 12, w: topBtnSize, h: topBtnSize, label:'⌂', accent:false};
+    drawButton(bPause); drawButton(bHome);
+    if (buttonClicked(bPause)) game.pause = !game.pause;
+    if (buttonClicked(bHome)) goto(SCENES.MENU);
+
+    // D-Pad for touch
+    if (isTouch) {
+      const dpadBtnSize = Math.max(52, Math.min(72, Math.floor(W * 0.18)));
+      const dGap = 12;
+      const cX = W/2;
+      const baseY = Math.min(H - dpadBtnSize - 16, gridTop + totalH - dpadBtnSize - 8);
+
+      const up =   {x: cX - dpadBtnSize/2, y: baseY - dpadBtnSize - dGap, w:dpadBtnSize, h:dpadBtnSize, label:'↑', accent:false};
+      const left = {x: cX - dpadBtnSize - dGap - dpadBtnSize/2, y: baseY, w:dpadBtnSize, h:dpadBtnSize, label:'←', accent:false};
+      const down = {x: cX - dpadBtnSize/2, y: baseY, w:dpadBtnSize, h:dpadBtnSize, label:'↓', accent:false};
+      const right={x: cX + dpadBtnSize + dGap - dpadBtnSize/2, y: baseY, w:dpadBtnSize, h:dpadBtnSize, label:'→', accent:false};
+
+      drawButton(up); drawButton(left); drawButton(down); drawButton(right);
+
+      if (buttonClicked(up)   && !isOpposite(game.dir, DIRS.UP))    game.nextDir = DIRS.UP;
+      if (buttonClicked(down) && !isOpposite(game.dir, DIRS.DOWN))  game.nextDir = DIRS.DOWN;
+      if (buttonClicked(left) && !isOpposite(game.dir, DIRS.LEFT))  game.nextDir = DIRS.LEFT;
+      if (buttonClicked(right)&& !isOpposite(game.dir, DIRS.RIGHT)) game.nextDir = DIRS.RIGHT;
     }
 
+    // overlays
     if (!game.alive) {
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.fillRect(0,0,W,H);
+      ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0,0,W,H);
       const ow = Math.min(420, W*0.9), oh = 240;
       const ox = (W-ow)/2, oy=(H-oh)/2;
       ctx.fillStyle = CONFIG.theme.panel;
       drawRoundedRect(ox,oy,ow,oh,20); ctx.fill();
       ctx.textAlign='center'; ctx.textBaseline='top';
       ctx.fillStyle = CONFIG.theme.white;
-      ctx.font = '800 26px Nunito';
-      ctx.fillText('Игра окончена!', ox+ow/2, oy+18);
-      ctx.font = '600 18px Nunito';
+      ctx.font = '800 24px Nunito';
+      ctx.fillText('Игра окончена!', ox+ow/2, oy+16);
+      ctx.font = '600 16px Nunito';
       ctx.fillStyle = CONFIG.theme.muted;
-      ctx.fillText(`Счёт: ${game.score}   •   Рекорд сегодня: ${state.daily[todayKey()].gameHighScore||0}`, ox+ow/2, oy+60);
+      ctx.fillText(`Счёт: ${game.score}   •   Рекорд сегодня: ${state.daily[todayKey()].gameHighScore||0}`, ox+ow/2, oy+56);
 
-      const bRetry = {x: ox+40, y: oy+oh-70, w: (ow-120)/2, h: 50, label:'Играть снова', accent:true};
-      const bMenu = {x: ox+ow/2+20, y: oy+oh-70, w: (ow-120)/2, h: 50, label:'Меню', accent:false};
+      const bRetry = {x: ox+28, y: oy+oh-70, w: (ow-96)/2, h: 50, label:'Играть снова', accent:true};
+      const bMenu = {x: ox+ow/2+20, y: oy+oh-70, w: (ow-96)/2, h: 50, label:'Меню', accent:false};
       drawButton(bRetry); drawButton(bMenu);
       if (buttonClicked(bRetry)) gameInit();
       if (buttonClicked(bMenu)) goto(SCENES.MENU);
@@ -827,15 +790,15 @@
       drawRoundedRect(ox,oy,ow,oh,18); ctx.fill();
       ctx.textAlign='center'; ctx.textBaseline='top';
       ctx.fillStyle = CONFIG.theme.white;
-      ctx.font = '800 24px Nunito';
-      ctx.fillText('Пауза', ox+ow/2, oy+16);
+      ctx.font = '800 22px Nunito';
+      ctx.fillText('Пауза', ox+ow/2, oy+14);
 
       const labels = [
         {k:'speechRate', name:'Скорость речи', min:0.6, max:1.4, step:0.05},
         {k:'speechPitch', name:'Высота', min:0.7, max:1.3, step:0.05},
         {k:'speechVolume', name:'Громкость', min:0.2, max:1.0, step:0.1},
       ];
-      let sy = oy + 64;
+      let sy = oy + 56;
       for (const s of labels) {
         ctx.textAlign='left'; ctx.textBaseline='middle';
         ctx.font='600 16px Nunito';
@@ -853,23 +816,15 @@
         ctx.textAlign='right'; ctx.font='700 18px Nunito'; ctx.fillStyle=CONFIG.theme.white;
         ctx.fillText(val.toFixed(2).replace('.', ','), minus.x - 12, sy);
 
-        if (buttonClicked(minus)) {
-          state.settings[s.k] = Number((clamp(val - s.step, s.min, s.max)).toFixed(2));
-          saveState();
-        }
-        if (buttonClicked(plus)) {
-          state.settings[s.k] = Number((clamp(val + s.step, s.min, s.max)).toFixed(2));
-          saveState();
-        }
-        if (buttonClicked(test)) {
-          speak('pizza, pasta, gelato', {lang: CONFIG.voice.it});
-        }
+        if (buttonClicked(minus)) { state.settings[s.k] = Number((clamp(val - s.step, s.min, s.max)).toFixed(2)); saveState(); }
+        if (buttonClicked(plus))  { state.settings[s.k] = Number((clamp(val + s.step, s.min, s.max)).toFixed(2)); saveState(); }
+        if (buttonClicked(test)) speak('pizza, pasta, gelato', {lang: CONFIG.voice.it});
 
-        sy += 56;
+        sy += 54;
       }
 
-      const bResume = {x: ox+40, y: oy+oh-64, w:(ow-120)/2, h:48, label:'Продолжить', accent:true};
-      const bMenu = {x: ox+ow/2+20, y: oy+oh-64, w:(ow-120)/2, h:48, label:'Меню', accent:false};
+      const bResume = {x: ox+28, y: oy+oh-64, w:(ow-88)/2, h:48, label:'Продолжить', accent:true};
+      const bMenu = {x: ox+ow/2+16, y: oy+oh-64, w:(ow-88)/2, h:48, label:'Меню', accent:false};
       drawButton(bResume); drawButton(bMenu);
       if (buttonClicked(bResume)) game.pause = false;
       if (buttonClicked(bMenu)) goto(SCENES.MENU);
@@ -891,8 +846,8 @@
       ctx.font = '700 16px Nunito';
       const tw = ctx.measureText(text).width + 28;
       const th = 36;
-      const x = W - tw - 20;
-      y -= (th + 10);
+      const x = W - tw - 16;
+      y -= (th + 8);
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       drawRoundedRect(x, y, tw, th, 12); ctx.fill();
       ctx.fillStyle = toast.color || CONFIG.theme.accent3;
@@ -912,52 +867,52 @@
 
     ctx.textAlign='left'; ctx.textBaseline='top';
     ctx.fillStyle=CONFIG.theme.white;
-    ctx.font = '800 32px Nunito';
-    ctx.fillText('Добро пожаловать!', px+24, py+20);
-    ctx.font = '600 16px Nunito';
+    ctx.font = '800 28px Nunito';
+    ctx.fillText('Добро пожаловать!', px+20, py+18);
+    ctx.font = '600 14px Nunito';
     ctx.fillStyle = CONFIG.theme.muted;
-    ctx.fillText('Учите итальянские слова с карточками, викторинами и игрой «Мышка и пицца».', px+24, py+62);
+    ctx.fillText('Учите итальянские слова с карточками, викторинами и игрой «Мышка и пицца».', px+20, py+52);
 
     const {streak, last7} = streakInfo();
     const today = state.daily[todayKey()];
     const xpToday = today ? today.xp : 0;
 
-    const statW = (pw - 24*2 - 20)/2;
-    const s1 = {x:px+24, y:py+100, w:statW, h:140};
-    const s2 = {x:px+24+statW+20, y:py+100, w:statW, h:140};
+    const statW = (pw - 24*2 - 16)/2;
+    const s1 = {x:px+24, y:py+92, w:statW, h:132};
+    const s2 = {x:px+24+statW+16, y:py+92, w:statW, h:132};
 
     ctx.fillStyle = CONFIG.theme.panelStrong; drawRoundedRect(s1.x, s1.y, s1.w, s1.h, 16); ctx.fill();
-    ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillStyle=CONFIG.theme.muted; ctx.font='600 14px Nunito';
-    ctx.fillText('Серия дней', s1.x+16, s1.y+12);
-    ctx.fillStyle=CONFIG.theme.white; ctx.font='800 42px Nunito';
-    ctx.fillText(`${streak}`, s1.x+16, s1.y+44);
+    ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillStyle=CONFIG.theme.muted; ctx.font='600 13px Nunito';
+    ctx.fillText('Серия дней', s1.x+14, s1.y+10);
+    ctx.fillStyle=CONFIG.theme.white; ctx.font='800 38px Nunito';
+    ctx.fillText(`${streak}`, s1.x+14, s1.y+42);
 
     ctx.fillStyle = CONFIG.theme.panelStrong; drawRoundedRect(s2.x, s2.y, s2.w, s2.h, 16); ctx.fill();
-    ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillStyle=CONFIG.theme.muted; ctx.font='600 14px Nunito';
-    ctx.fillText('Опыт сегодня', s2.x+16, s2.y+12);
-    ctx.fillStyle=CONFIG.theme.white; ctx.font='800 42px Nunito';
-    ctx.fillText(`${xpToday}`, s2.x+16, s2.y+44);
+    ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillStyle=CONFIG.theme.muted; ctx.font='600 13px Nunito';
+    ctx.fillText('Опыт сегодня', s2.x+14, s2.y+10);
+    ctx.fillStyle=CONFIG.theme.white; ctx.font='800 38px Nunito';
+    ctx.fillText(`${xpToday}`, s2.x+14, s2.y+42);
 
-    const chart = {x:px+24, y:py+260, w:pw-48, h:120};
+    const chart = {x:px+24, y:py+238, w:pw-48, h:112};
     ctx.fillStyle = CONFIG.theme.panelStrong; drawRoundedRect(chart.x, chart.y, chart.w, chart.h, 16); ctx.fill();
-    ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillStyle=CONFIG.theme.muted; ctx.font='600 14px Nunito';
-    ctx.fillText('Прогресс за 7 дней (XP)', chart.x+16, chart.y+12);
+    ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillStyle=CONFIG.theme.muted; ctx.font='600 13px Nunito';
+    ctx.fillText('Прогресс за 7 дней (XP)', chart.x+14, chart.y+10);
     const maxXP = Math.max(20, ...last7.map(d=>d.xp));
-    const barW = (chart.w - 32 - 6*10)/7;
+    const barW = (chart.w - 28 - 6*8)/7;
     for (let i=0;i<7;i++) {
       const v = last7[i].xp;
-      const barH = (chart.h - 48) * (v/maxXP);
-      const bx = chart.x + 16 + i*(barW+10);
-      const by = chart.y + chart.h - 16 - barH;
+      const barH = (chart.h - 44) * (v/maxXP);
+      const bx = chart.x + 14 + i*(barW+8);
+      const by = chart.y + chart.h - 14 - barH;
       ctx.fillStyle = i===6 ? CONFIG.theme.accent2 : CONFIG.theme.accent3;
       drawRoundedRect(bx, by, barW, barH, 8); ctx.fill();
     }
 
-    const btnW = Math.min(280, pw/3 - 20), btnH = 56;
-    const baseX = px+24, baseY = py + ph - 24 - btnH;
+    const btnW = Math.min(260, pw/3 - 16), btnH = 54;
+    const baseX = px+24, baseY = py + ph - 18 - btnH;
     const bFlash = {x:baseX, y:baseY, w:btnW, h:btnH, label:'Карточки', icon:'🃏', accent:true};
-    const bQuiz  = {x:baseX + btnW + 16, y:baseY, w:btnW, h:btnH, label:'Викторина', icon:'❓', accent:false};
-    const bGame  = {x:baseX + (btnW + 16)*2, y:baseY, w:btnW, h:btnH, label:'Мышка и пицца', icon:'🧀', accent:false};
+    const bQuiz  = {x:baseX + btnW + 12, y:baseY, w:btnW, h:btnH, label:'Викторина', icon:'❓', accent:false};
+    const bGame  = {x:baseX + (btnW + 12)*2, y:baseY, w:btnW, h:btnH, label:'Мышка и пицца', icon:'🧀', accent:false};
 
     drawButton(bFlash); drawButton(bQuiz); drawButton(bGame);
 
@@ -965,12 +920,12 @@
     if (buttonClicked(bQuiz)) goto(SCENES.QUIZ);
     if (buttonClicked(bGame)) goto(SCENES.GAME);
 
-    const bProg = {x:px+pw-150, y:py+20, w:130, h:40, label:'Прогресс', accent:false};
+    const bProg = {x:px+pw-140, y:py+16, w:120, h:38, label:'Прогресс', accent:false};
     drawButton(bProg);
     if (buttonClicked(bProg)) goto(SCENES.PROGRESS);
   }
 
-  // ========= Progress Screen =========
+  // ========= Progress =========
   function drawProgress() {
     const pw = Math.min(880, W*0.92), ph = Math.min(600, H*0.78);
     const px = (W-pw)/2, py=(H-ph)/2;
@@ -978,8 +933,8 @@
     ctx.fillStyle = CONFIG.theme.panel;
     drawRoundedRect(px,py,pw,ph,24); ctx.fill();
 
-    ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillStyle=CONFIG.theme.white; ctx.font='800 28px Nunito';
-    ctx.fillText('Ваш прогресс', px+24, py+18);
+    ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillStyle=CONFIG.theme.white; ctx.font='800 26px Nunito';
+    ctx.fillText('Ваш прогресс', px+20, py+16);
 
     const d = state.daily[todayKey()] || {};
     const items = [
@@ -990,41 +945,41 @@
       {name:'XP сегодня', value:d.xp||0, color:'#ff9f6e'},
     ];
 
-    const iw = (pw-48), ih = 56;
-    let iy = py + 64;
+    const iw = (pw-48), ih = 54;
+    let iy = py + 60;
     for (const it of items) {
       ctx.fillStyle = CONFIG.theme.panelStrong; drawRoundedRect(px+24, iy, iw, ih, 14); ctx.fill();
       ctx.textAlign='left'; ctx.textBaseline='middle';
-      ctx.fillStyle = CONFIG.theme.muted; ctx.font='600 16px Nunito';
-      ctx.fillText(it.name, px+40, iy+ih/2);
+      ctx.fillStyle = CONFIG.theme.muted; ctx.font='600 15px Nunito';
+      ctx.fillText(it.name, px+36, iy+ih/2);
       ctx.textAlign='right'; ctx.fillStyle=it.color; ctx.font='800 18px Nunito';
-      ctx.fillText(`${it.value}`, px+24+iw-16, iy+ih/2);
-      iy += ih + 12;
+      ctx.fillText(`${it.value}`, px+24+iw-14, iy+ih/2);
+      iy += ih + 10;
     }
 
     const mastered = Object.values(state.wordsProgress).filter(wp=>wp.mastered).length;
-    ctx.fillStyle = CONFIG.theme.panelStrong; const mw=iw; const mh=80;
+    ctx.fillStyle = CONFIG.theme.panelStrong; const mw=iw; const mh=76;
     drawRoundedRect(px+24, iy, mw, mh, 14); ctx.fill();
     ctx.textAlign='left'; ctx.textBaseline='top';
-    ctx.fillStyle=CONFIG.theme.muted; ctx.font='600 16px Nunito';
-    ctx.fillText('Слова на мастере:', px+40, iy+14);
-    ctx.fillStyle=CONFIG.theme.white; ctx.font='800 34px Nunito';
-    ctx.fillText(`${mastered}`, px+40, iy+40);
+    ctx.fillStyle=CONFIG.theme.muted; ctx.font='600 15px Nunito';
+    ctx.fillText('Слова на мастере:', px+36, iy+12);
+    ctx.fillStyle=CONFIG.theme.white; ctx.font='800 32px Nunito';
+    ctx.fillText(`${mastered}`, px+36, iy+40);
 
-    const bBack = {x:px+pw-140, y:py+ph-64, w:120, h:44, label:'Назад', accent:false};
+    const bBack = {x:px+pw-130, y:py+ph-60, w:110, h:42, label:'Назад', accent:false};
     drawButton(bBack); if (buttonClicked(bBack)) goto(SCENES.MENU);
   }
 
   // ========= Main Loop =========
   let lastT = 0;
   function loop(ts) {
-    const dt = ts - lastT; lastT = ts;
+    lastT = ts;
     drawBackground(ts);
 
     switch (currentScene) {
       case SCENES.MENU: drawMenu(); break;
       case SCENES.FLASH: drawFlash(); break;
-      case SCENES.QUIZ: drawQuiz(ts); break;
+      case SCENES.QUIZ: drawQuiz(); break;
       case SCENES.GAME: drawGame(ts); break;
       case SCENES.PROGRESS: drawProgress(); break;
     }
@@ -1036,12 +991,18 @@
 
     requestAnimationFrame(loop);
   }
+
+  // ========= Boot =========
+  // Привяжем resize после того, как определён initFloaters
+  window.addEventListener('resize', () => { resize(); initFloaters(); });
+  resize();
+  initFloaters();
   requestAnimationFrame(loop);
 
+  // ========= Startup toast =========
   setTimeout(()=>{
     toasts.push({text:'Нажмите в любом месте, чтобы включить звук 🔊', ts: now(), color: CONFIG.theme.accent2});
   }, 600);
-
 })();
 </script>
 </body>
