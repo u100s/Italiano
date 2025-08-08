@@ -1,0 +1,16 @@
+# .gitlab-ci.yml
+stages: [deploy]
+
+pages:
+  stage: deploy
+  image: alpine:latest
+  script:
+    - mkdir -p public
+    - cp index.html public/index.html
+    # Если есть доп. файлы/папки, копируй их тоже:
+    # - cp -r assets public/assets
+  artifacts:
+    paths:
+      - public
+  only:
+    - main  # или master — поменяй на название твоей основной ветки
