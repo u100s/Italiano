@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>La Dolce Vita — Итальянский в игре</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #0b0f1a;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Nunito', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<canvas id="app"></canvas>
+
+<script>
+(() => {
+  // ========= Config & Theme =========
+  const CONFIG = {
+    appName: 'La Dolce Vita',
+    theme: {
+      bgTop: '#0b0f1a',
+      bgBottom: '#131b2e',
+      accent: '#FF4D4D',     // Italian red
+      accent2: '#2ECC71',    // basil green
+      accent3: '#F8E16C',    // cheese yellow
+      white: '#F5F7FB',
+      muted: '#9aa6c1',
+      panel: 'rgba(255,255,255,0.06)',
+      panelStrong: 'rgba(255,255,255,0.12)',
+      shadow: 'rgba(0,0,0,0.25)',
+    },
+    grid: {
+      cols: 24,
+      rows: 16,
+      speedMs: 120,
+    },
+    quizOptions: 4,
+    masteryThreshold: 5,
+    xp: {
+      flashKnow: 10,
+      quizCorrect: 15,
+      pizza: 5,
+      gameStep: 0,
+    },
+    voice: {
+      it: 'it-IT',
+      ru: 'ru-RU',
+      rate: 1.0,
+      pitch: 1.0,
+      volume: 1.0,
+    },
+  };
+
+  // ========= Canvas Setup =========
+  const canvas = document.getElementById('app');
+  const ctx = canvas.getContext('2d');
+  let DPR = Math.max(1, window.devicePixelRatio || 1);
+  let W = 0, H = 0;
+  const resize = () => {
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  };
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ========= Utilities =========
+  const rand = (a, b) => Math.random() * (b - a) + a;
+  const randInt = (a, b) => Math.floor(rand(a, b + 1));
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const now = () => performance.now();
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function todayKey() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  // ========= Data: Words (Italian -> Russian) =========
+  const WORDS = [
+    {it:'ciao', ru:'привет', cat:'Базовые'}, {it:'buongiorno', ru:'доброе утро', cat:'Базовые'},
+    {it:'buonasera', ru:'добрый вечер', cat:'Базовые'}, {it:'arrivederci', ru:'до свидания', cat:'Базовые'},
+    {it:'per favore', ru:'пожалуйста', cat:'Базовые'}, {it:'grazie', ru:'спасибо', cat:'Базовые'},
+    {it:'prego', ru:'на здоровье', cat:'Базовые'}, {it:'scusa', ru:'извини', cat:'Базовые'},
+    {it:'mi dispiace', ru:'мне жаль', cat:'Базовые'}, {it:'come stai?', ru:'как ты?', cat:'Базовые'},
+    {it:'bene', ru:'хорошо', cat:'Базовые'}, {it:'male', ru:'плохо', cat:'Базовые'},
+    {it:'così così', ru:'так себе', cat:'Базовые'}, {it:'sì', ru:'да', cat:'Базовые'},
+    {it:'no', ru:'нет', cat:'Базовые'}, {it:'capisco', ru:'понимаю', cat:'Базовые'},
+    {it:'non capisco', ru:'не понимаю', cat:'Базовые'}, {it:'parli inglese?', ru:'вы говорите по-английски?', cat:'Базовые'},
+
+    {it:'acqua', ru:'вода', cat:'Еда'}, {it:'pane', ru:'хлеб', cat:'Еда'},
+    {it:'formaggio', ru:'сыр', cat:'Еда'}, {it:'pizza', ru:'пицца', cat:'Еда'},
+    {it:'pasta', ru:'паста', cat:'Еда'}, {it:'pomodoro', ru:'помидор', cat:'Еда'},
+    {it:'olio', ru:'масло', cat:'Еда'}, {it:'sale', ru:'соль', cat:'Еда'},
+    {it:'zucchero', ru:'сахар', cat:'Еда'}, {it:'gelato', ru:'мороженое', cat:'Еда'},
+
+    {it:'stazione', ru:'вокзал', cat:'Путешествия'}, {it:'aeroporto', ru:'аэропорт', cat:'Путешествия'},
+    {it:'biglietto', ru:'билет', cat:'Путешествия'}, {it:'bagaglio', ru:'багаж', cat:'Путешествия'},
+    {it:'albergo', ru:'отель', cat:'Путешествия'}, {it:'ristorante', ru:'ресторан', cat:'Путешествия'},
+    {it:'fermata', ru:'остановка', cat:'Путешествия'}, {it:'mappa', ru:'карта', cat:'Путешествия'},
+    {it:'sinistra', ru:'налево', cat:'Путешествия'}, {it:'destra', ru:'направо', cat:'Путешествия'},
+
+    {it:'uno', ru:'один', cat:'Числа'}, {it:'due', ru:'два', cat:'Числа'},
+    {it:'tre', ru:'три', cat:'Числа'}, {it:'quattro', ru:'четыре', cat:'Числа'},
+    {it:'cinque', ru:'пять', cat:'Числа'}, {it:'sei', ru:'шесть', cat:'Числа'},
+    {it:'sette', ru:'семь', cat:'Числа'}, {it:'otto', ru:'восемь', cat:'Числа'},
+    {it:'nove', ru:'девять', cat:'Числа'}, {it:'dieci', ru:'десять', cat:'Числа'},
+
+    {it:'mi chiamo...', ru:'меня зовут...', cat:'Фразы'}, {it:'piacere', ru:'приятно познакомиться', cat:'Фразы'},
+    {it:'quanto costa?', ru:'сколько стоит?', cat:'Фразы'}, {it:'dove è il bagno?', ru:'где туалет?', cat:'Фразы'},
+    {it:'aiuto!', ru:'помогите!', cat:'Фразы'}, {it:'ho bisogno di...', ru:'мне нужно...', cat:'Фразы'},
+
+    {it:'rosso', ru:'красный', cat:'Цвета'}, {it:'verde', ru:'зелёный', cat:'Цвета'},
+    {it:'giallo', ru:'жёлтый', cat:'Цвета'}, {it:'blu', ru:'синий', cat:'Цвета'},
+    {it:'nero', ru:'чёрный', cat:'Цвета'}, {it:'bianco', ru:'белый', cat:'Цвета'},
+
+    {it:'madre', ru:'мать', cat:'Семья'}, {it:'padre', ru:'отец', cat:'Семья'},
+    {it:'fratello', ru:'брат', cat:'Семья'}, {it:'sorella', ru:'сестра', cat:'Семья'},
+    {it:'figlio', ru:'сын', cat:'Сын'}, {it:'figlia', ru:'дочь', cat:'Семья'},
+  ];
+
+  // ========= Storage & Progress =========
+  const STORAGE_KEY = 'dolcevita_progress_v1';
+  let state = {
+    wordsProgress: {},
+    daily: {},
+    settings: {
+      speechRate: CONFIG.voice.rate,
+      speechPitch: CONFIG.voice.pitch,
+      speechVolume: CONFIG.voice.volume,
+      voiceIt: null,
+    },
+    lastOpenDate: todayKey(),
+  };
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        state = Object.assign(state, parsed);
+      }
+    } catch (_) {}
+    ensureTodayBucket();
+  }
+  function saveState() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) {}
+  }
+  function ensureTodayBucket() {
+    const t = todayKey();
+    if (!state.daily[t]) {
+      state.daily[t] = {flashcardsReviewed:0, quizCorrect:0, quizTotal:0, pizzasEaten:0, xp:0, gameHighScore:0};
+    }
+    state.lastOpenDate = t;
+  }
+  function addXP(n) {
+    ensureTodayBucket();
+    state.daily[todayKey()].xp += n;
+    saveState();
+  }
+  function incDaily(field, n=1) {
+    ensureTodayBucket();
+    state.daily[todayKey()][field] = (state.daily[todayKey()][field] || 0) + n;
+    saveState();
+  }
+  function setHighScore(score) {
+    ensureTodayBucket();
+    const d = state.daily[todayKey()];
+    if (score > (d.gameHighScore || 0)) {
+      d.gameHighScore = score;
+      saveState();
+    }
+  }
+  function streakInfo() {
+    const today = todayKey();
+    let streak = 0;
+    let day = new Date(today);
+    while (true) {
+      const y = day.getFullYear(), m = (day.getMonth()+1).toString().padStart(2,'0'), d = day.getDate().toString().padStart(2,'0');
+      const k = `${y}-${m}-${d}`;
+      const entry = state.daily[k];
+      const active = entry && ((entry.flashcardsReviewed||0)+(entry.quizTotal||0)+(entry.pizzasEaten||0)+(entry.xp||0) > 0);
+      if (active) { streak++; } else { break; }
+      day.setDate(day.getDate()-1);
+    }
+    const last7 = [];
+    const ref = new Date(today);
+    for (let i=6;i>=0;i--) {
+      const d = new Date(ref); d.setDate(d.getDate()-i);
+      const y = d.getFullYear(), m = (d.getMonth()+1).toString().padStart(2,'0'), dd = d.getDate().toString().padStart(2,'0');
+      const k = `${y}-${m}-${dd}`;
+      const e = state.daily[k];
+      last7.push({date:k, xp:(e&&e.xp)||0});
+    }
+    return {streak, last7};
+  }
+
+  loadState();
+
+  // ========= Speech Synthesis =========
+  let voices = [];
+  let audioPrimed = false;
+
+  function loadVoices() {
+    voices = speechSynthesis.getVoices();
+    const it = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('it'));
+    if (it) state.settings.voiceIt = it.name;
+  }
+  loadVoices();
+  window.speechSynthesis.onvoiceschanged = () => {
+    loadVoices();
+  };
+
+  function speak(text, {lang=CONFIG.voice.it, rate, pitch, volume, force=false}={}) {
+    if (!audioPrimed && !force) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang;
+    u.rate = rate ?? state.settings.speechRate;
+    u.pitch = pitch ?? state.settings.speechPitch;
+    u.volume = volume ?? state.settings.speechVolume;
+    if (lang.startsWith('it') && state.settings.voiceIt) {
+      const v = voices.find(v=>v.name===state.settings.voiceIt);
+      if (v) u.voice = v;
+    }
+    speechSynthesis.speak(u);
+  }
+
+  function primeAudio() {
+    if (audioPrimed) return;
+    audioPrimed = true;
+    speak('Benvenuta!', {lang: CONFIG.voice.it, force:true});
+    setTimeout(()=>speechSynthesis.cancel(), 50);
+  }
+
+  // ========= Input =========
+  const input = {
+    mouseX: 0, mouseY: 0,
+    down: false,
+    justPressed: false,
+    justReleased: false,
+    keys: {},
+    arrows: {x:0,y:0},
+  };
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    input.mouseX = e.clientX - rect.left;
+    input.mouseY = e.clientY - rect.top;
+  });
+  canvas.addEventListener('mousedown', e => {
+    primeAudio();
+    input.down = true; input.justPressed = true;
+  });
+  canvas.addEventListener('mouseup', e => {
+    input.down = false; input.justReleased = true;
+  });
+  canvas.addEventListener('touchstart', e => {
+    primeAudio();
+    const t = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    input.mouseX = t.clientX - rect.left;
+    input.mouseY = t.clientY - rect.top;
+    input.down = true; input.justPressed = true;
+    e.preventDefault();
+  }, {passive:false});
+  canvas.addEventListener('touchmove', e => {
+    const t = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    input.mouseX = t.clientX - rect.left;
+    input.mouseY = t.clientY - rect.top;
+    e.preventDefault();
+  }, {passive:false});
+  canvas.addEventListener('touchend', e => {
+    input.down = false; input.justReleased = true;
+    e.preventDefault();
+  }, {passive:false});
+
+  window.addEventListener('keydown', e => {
+    input.keys[e.key] = true;
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+  }, {passive:false});
+  window.addEventListener('keyup', e => {
+    input.keys[e.key] = false;
+  });
+
+  // ========= UI Elements (Canvas) =========
+  function drawRoundedRect(x, y, w, h, r) {
+    const rr = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+rr, y);
+    ctx.arcTo(x+w, y, x+w, y+h, rr);
+    ctx.arcTo(x+w, y+h, x, y+h, rr);
+    ctx.arcTo(x, y+h, x, y, rr);
+    ctx.arcTo(x, y, x+w, y, rr);
+    ctx.closePath();
+  }
+
+  function drawButton(btn) {
+    const {x,y,w,h,label,accent=false,icon=null} = btn;
+    const hover = hit(btn, input.mouseX, input.mouseY);
+    const pressed = hover && input.down;
+    const c1 = accent ? CONFIG.theme.accent : CONFIG.theme.panel;
+    const c2 = accent ? CONFIG.theme.accent2 : CONFIG.theme.panelStrong;
+    const grad = ctx.createLinearGradient(x, y, x, y+h);
+    grad.addColorStop(0, pressed ? c2 : c1);
+    grad.addColorStop(1, pressed ? c1 : c2);
+    ctx.fillStyle = grad;
+    drawRoundedRect(x,y,w,h,16);
+    ctx.fill();
+    ctx.shadowColor = CONFIG.theme.shadow; ctx.shadowBlur = 12; ctx.shadowOffsetY = 4;
+    ctx.fillStyle = 'transparent';
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+    ctx.fillStyle = CONFIG.theme.white;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '600 18px Nunito';
+    if (icon) {
+      ctx.font = '600 18px Nunito';
+      ctx.fillText(icon + ' ' + label, x + w/2, y + h/2);
+    } else {
+      ctx.fillText(label, x + w/2, y + h/2);
+    }
+  }
+
+  function buttonClicked(btn) {
+    btn._hover = hit(btn, input.mouseX, input.mouseY);
+    if (btn._hover && input.justReleased) return true;
+    return false;
+  }
+
+  function hit(r, mx, my) {
+    return mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h;
+  }
+
+  // ========= Background Particles (Theme) =========
+  const floaters = [];
+  const FLOATER_ICONS = ['🍕','🍅','🍦','🧀','🍝','🍇'];
+  function initFloaters() {
+    floaters.length = 0;
+    const n = Math.floor((W*H)/60000) + 12;
+    for (let i=0; i<n; i++) {
+      floaters.push({
+        x: rand(0, W), y: rand(0, H),
+        r: rand(12, 28),
+        s: rand(0.1, 0.4),
+        a: rand(0.25, 0.65),
+        icon: FLOATER_ICONS[randInt(0, FLOATER_ICONS.length-1)],
+        rot: rand(0, Math.PI*2),
+        rotS: rand(-0.3, 0.3),
+      });
+    }
+  }
+  initFloaters();
+
+  function drawBackground(t) {
+    const g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0, CONFIG.theme.bgTop);
+    g.addColorStop(1, CONFIG.theme.bgBottom);
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,W,H);
+
+    ctx.save();
+    ctx.globalAlpha = 0.06;
+    ctx.strokeStyle = '#ffffff';
+    const step = 60;
+    for (let x=-H; x<W+H; x+=step) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x+H, H);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const f of floaters) {
+      f.y -= f.s;
+      f.rot += f.rotS * 0.01;
+      if (f.y < -40) { f.y = H + 40; f.x = rand(0, W); }
+      ctx.globalAlpha = f.a;
+      ctx.font = `800 ${f.r}px Nunito`;
+      ctx.save();
+      ctx.translate(f.x, f.y);
+      ctx.rotate(f.rot);
+      ctx.fillText(f.icon, 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
+
+    ctx.fillStyle = CONFIG.theme.white;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.font = '800 26px Nunito';
+    ctx.fillText('La Dolce Vita', 24, 18);
+
+    ctx.globalAlpha = 0.7;
+    ctx.font = '600 14px Nunito';
+    ctx.fillStyle = CONFIG.theme.muted;
+    ctx.fillText('Итальянский с улыбкой — играй и учись!', 24, 48);
+    ctx.globalAlpha = 1;
+  }
+
+  // ========= Scene Management =========
+  const SCENES = { MENU:'MENU', FLASH:'FLASH', QUIZ:'QUIZ', GAME:'GAME', PROGRESS:'PROGRESS' };
+  let currentScene = SCENES.MENU;
+
+  function goto(scene) {
+    currentScene = scene;
+    if (scene === SCENES.GAME) gameInit();
+    if (scene === SCENES.FLASH) flashInit();
+    if (scene === SCENES.QUIZ) quizInit();
+  }
+
+  // ========= Word Helpers =========
+  function getWordProgress(it) {
+    if (!state.wordsProgress[it]) state.wordsProgress[it] = {seen:0, correct:0, mastered:false, lastSeen:null};
+    return state.wordsProgress[it];
+  }
+  function markSeen(w) {
+    const wp = getWordProgress(w.it);
+    wp.seen++; wp.lastSeen = todayKey();
+    if (!wp.mastered && wp.correct >= CONFIG.masteryThreshold) wp.mastered = true;
+    saveState();
+  }
+  function markCorrect(w) {
+    const wp = getWordProgress(w.it);
+    wp.correct++;
+    if (!wp.mastered && wp.correct >= CONFIG.masteryThreshold) wp.mastered = true;
+    wp.lastSeen = todayKey();
+    saveState();
+  }
+  function shuffle(arr) {
+    for (let i=arr.length-1; i>0; i--) {
+      const j = Math.floor(Math.random()*(i+1));
+      [arr[i],arr[j]]=[arr[j],arr[i]];
+    }
+    return arr;
+  }
+
+  // ========= Flashcards =========
+  let flashQueue = [];
+  let flashCurrent = null;
+  let flashFlipped = false;
+
+  function flashInit() {
+    const pool = WORDS.slice();
+    pool.sort((a,b) => {
+      const pa = getWordProgress(a.it), pb = getWordProgress(b.it);
+      const aScore = (pa.mastered?1:0)*100 + (pa.correct||0);
+      const bScore = (pb.mastered?1:0)*100 + (pb.correct||0);
+      return aScore - bScore;
+    });
+    flashQueue = shuffle(pool.slice(0, 24));
+    nextFlash();
+  }
+
+  function nextFlash() {
+    flashFlipped = false;
+    if (flashQueue.length === 0) {
+      flashInit();
+      return;
+    }
+    flashCurrent = flashQueue.shift();
+    markSeen(flashCurrent);
+  }
+
+  function drawFlash() {
+    const cardW = Math.min(520, W*0.8);
+    const cardH = Math.min(320, H*0.5);
+    const x = (W-cardW)/2, y = (H-cardH)/2 - 20;
+
+    ctx.fillStyle = CONFIG.theme.panel;
+    drawRoundedRect(x, y, cardW, cardH, 24);
+    ctx.fill();
+
+    ctx.font = '600 14px Nunito';
+    ctx.fillStyle = CONFIG.theme.muted;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText(flashCurrent.cat || 'Слова', x+20, y+16);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = CONFIG.theme.white;
+    ctx.font = '800 48px Nunito';
+    ctx.fillText(flashCurrent.it, x + cardW/2, y + cardH/2 - 12);
+
+    ctx.font = '600 24px Nunito';
+    ctx.fillStyle = flashFlipped ? CONFIG.theme.accent3 : 'rgba(255,255,255,0.18)';
+    ctx.fillText(flashFlipped ? flashCurrent.ru : 'нажмите, чтобы открыть перевод', x + cardW/2, y + cardH/2 + 36);
+
+    const btnW = 160, btnH = 48, gap = 24;
+    const bY = y + cardH + 24;
+    const b1 = {x: x + cardW/2 - btnW - gap/2, y: bY, w: btnW, h: btnH, label:'Ещё', icon:'🔁'};
+    const b2 = {x: x + cardW/2 + gap/2, y: bY, w: btnW, h: btnH, label:'Знаю', icon:'✅', accent:true};
+    const bSound = {x: x + cardW - 56, y: y + 8, w: 40, h: 40, label:'🔊', accent:false};
+
+    drawButton(b1); drawButton(b2); drawButton(bSound);
+
+    const cardRect = {x, y, w: cardW, h: cardH};
+    if (input.justReleased && hit(cardRect, input.mouseX, input.mouseY)) {
+      flashFlipped = !flashFlipped;
+      if (flashFlipped) speak(flashCurrent.it, {lang: CONFIG.voice.it});
+    }
+    if (buttonClicked(bSound)) {
+      speak(flashCurrent.it, {lang: CONFIG.voice.it});
+    }
+    if (buttonClicked(b1)) {
+      flashQueue.push(flashCurrent);
+      incDaily('flashcardsReviewed', 1);
+      addXP(CONFIG.xp.flashKnow/2|0);
+      nextFlash();
+    }
+    if (buttonClicked(b2)) {
+      markCorrect(flashCurrent);
+      incDaily('flashcardsReviewed', 1);
+      addXP(CONFIG.xp.flashKnow);
+      nextFlash();
+    }
+  }
+
+  // ========= Quiz =========
+  let quizCurrent = null;
+  let quizOptions = [];
+  let quizFeedback = null;
+  function quizInit() {
+    pickQuiz();
+    quizFeedback = null;
+  }
+  function pickQuiz() {
+    const w = WORDS[randInt(0, WORDS.length-1)];
+    const wrongs = shuffle(WORDS.filter(x => x.ru !== w.ru)).slice(0, CONFIG.quizOptions-1);
+    quizOptions = shuffle([w, ...wrongs]);
+    quizCurrent = w;
+  }
+  function drawQuiz(t) {
+    const panelW = Math.min(640, W*0.9);
+    const panelH = Math.min(480, H*0.7);
+    const x = (W - panelW)/2, y = (H-panelH)/2 - 20;
+
+    ctx.fillStyle = CONFIG.theme.panel;
+    drawRoundedRect(x,y,panelW,panelH,22);
+    ctx.fill();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = CONFIG.theme.muted;
+    ctx.font = '600 14px Nunito';
+    ctx.fillText('Выберите перевод', x+panelW/2, y+16);
+
+    ctx.fillStyle = CONFIG.theme.white;
+    ctx.font = '800 42px Nunito';
+    ctx.fillText(quizCurrent.it, x+panelW/2, y+70);
+
+    const grid = {cols:2, rows:2};
+    const btnW = (panelW - 60)/grid.cols;
+    const btnH = 64;
+    const startY = y + 160;
+    let k = 0;
+
+    for (let r=0; r<grid.rows; r++) {
+      for (let c=0; c<grid.cols; c++) {
+        const bx = x + 20 + c*(btnW+20);
+        const by = startY + r*(btnH+20);
+        const opt = quizOptions[k];
+        const isCorrect = opt.ru === quizCurrent.ru;
+        const btn = {x:bx, y:by, w:btnW, h:btnH, label:opt.ru, accent:false};
+        let bg = CONFIG.theme.panel;
+        if (quizFeedback && quizFeedback.index === k) {
+          bg = quizFeedback.correct ? CONFIG.theme.accent2 : CONFIG.theme.accent;
+        }
+        ctx.fillStyle = bg;
+        drawRoundedRect(bx,by,btnW,btnH,14); ctx.fill();
+        ctx.fillStyle = CONFIG.theme.white;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = '600 20px Nunito';
+        ctx.fillText(opt.ru, bx+btnW/2, by+btnH/2);
+
+        if (buttonClicked(btn)) {
+          const correct = isCorrect;
+          quizFeedback = {correct, ts: now(), index:k};
+          incDaily('quizTotal', 1);
+          if (correct) {
+            incDaily('quizCorrect', 1);
+            addXP(CONFIG.xp.quizCorrect);
+            markCorrect(quizCurrent);
+            speak(quizCurrent.it, {lang: CONFIG.voice.it});
+          } else {
+            speak(quizCurrent.it + ' — ' + quizCurrent.ru, {lang: CONFIG.voice.it, rate: 0.95});
+          }
+          setTimeout(()=>{ quizFeedback=null; pickQuiz(); }, 700);
+        }
+
+        k++;
+      }
+    }
+
+    const bSound = {x: x + panelW - 56, y: y + 8, w: 40, h: 40, label:'🔊', accent:false};
+    drawButton(bSound);
+    if (buttonClicked(bSound)) speak(quizCurrent.it, {lang: CONFIG.voice.it});
+  }
+
+  // ========= Game: Mouse & Pizza (Snake) =========
+  const DIRS = {UP:{x:0,y:-1}, DOWN:{x:0,y:1}, LEFT:{x:-1,y:0}, RIGHT:{x:1,y:0}};
+  let cellSize = 24;
+  function calcGrid() {
+    const pad = 40;
+    const gw = W - pad*2, gh = H - pad*2 - 80;
+    const cellW = Math.floor(gw / CONFIG.grid.cols);
+    const cellH = Math.floor(gh / CONFIG.grid.rows);
+    cellSize = Math.max(14, Math.min(cellW, cellH));
+  }
+
+  let game = null;
+  let wordCycle = shuffle(WORDS.slice());
+  let wordIndex = 0;
+
+  function nextGameWord() {
+    if (wordIndex >= wordCycle.length) {
+      wordCycle = shuffle(WORDS.slice());
+      wordIndex = 0;
+    }
+    return wordCycle[wordIndex++];
+  }
+
+  function gameInit() {
+    calcGrid();
+    game = {
+      dir: DIRS.RIGHT,
+      nextDir: DIRS.RIGHT,
+      body: [],
+      pizza: null,
+      lastStep: 0,
+      alive: true,
+      score: 0,
+      pause: false,
+      speakCoolDown: 0,
+    };
+    const cx = Math.floor(CONFIG.grid.cols/2), cy = Math.floor(CONFIG.grid.rows/2);
+    game.body = [{x:cx, y:cy}, {x:cx-1, y:cy}, {x:cx-2, y:cy}];
+    spawnPizza();
+    game.lastStep = now();
+  }
+
+  function spawnPizza() {
+    let p;
+    while (true) {
+      p = {x: randInt(0, CONFIG.grid.cols-1), y: randInt(0, CONFIG.grid.rows-1)};
+      if (!game.body.some(b => b.x===p.x && b.y===p.y)) break;
+    }
+    game.pizza = p;
+  }
+
+  function setDirFromKeys() {
+    if (input.keys['ArrowUp'] && game.dir !== DIRS.DOWN) game.nextDir = DIRS.UP;
+    else if (input.keys['ArrowDown'] && game.dir !== DIRS.UP) game.nextDir = DIRS.DOWN;
+    else if (input.keys['ArrowLeft'] && game.dir !== DIRS.RIGHT) game.nextDir = DIRS.LEFT;
+    else if (input.keys['ArrowRight'] && game.dir !== DIRS.LEFT) game.nextDir = DIRS.RIGHT;
+    if (input.keys['p'] || input.keys['P']) game.pause = !game.pause;
+    if (input.keys['Escape']) goto(SCENES.MENU);
+  }
+
+  function gameStep() {
+    if (!game.alive || game.pause) return;
+    setDirFromKeys();
+    game.dir = game.nextDir;
+    const head = game.body[0];
+    const nx = head.x + game.dir.x, ny = head.y + game.dir.y;
+    const x = (nx + CONFIG.grid.cols) % CONFIG.grid.cols;
+    const y = (ny + CONFIG.grid.rows) % CONFIG.grid.rows;
+
+    if (game.body.some((b, i) => i>0 && b.x===x && b.y===y)) {
+      game.alive = false;
+      setHighScore(game.score);
+      return;
+    }
+
+    game.body.unshift({x,y});
+    if (x === game.pizza.x && y === game.pizza.y) {
+      game.score++;
+      incDaily('pizzasEaten', 1);
+      addXP(CONFIG.xp.pizza);
+      const w = nextGameWord();
+      speak(w.it, {lang: CONFIG.voice.it});
+      toasts.push({text: `${w.it} — ${w.ru}`, ts: now(), color: CONFIG.theme.accent3});
+      spawnPizza();
+    } else {
+      game.body.pop();
+    }
+  }
+
+  function drawMouseCell(cx, cy, idx) {
+    const x = gridLeft + cx*cellSize + cellSize/2;
+    const y = gridTop + cy*cellSize + cellSize/2;
+    ctx.save();
+    ctx.translate(x, y);
+    const radius = cellSize*0.44;
+    ctx.fillStyle = idx===0 ? '#bfc7e3' : '#9aa6c1';
+    ctx.beginPath(); ctx.arc(0,0,radius,0,Math.PI*2); ctx.fill();
+    if (idx===0) {
+      ctx.fillStyle = '#d7def5';
+      ctx.beginPath(); ctx.arc(-radius*0.6, -radius*0.6, radius*0.35, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(+radius*0.6, -radius*0.6, radius*0.35, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = CONFIG.theme.accent;
+      ctx.beginPath(); ctx.arc(radius*0.8, 0, radius*0.18, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#222b45';
+      ctx.beginPath(); ctx.arc(+radius*0.1, -radius*0.2, radius*0.12, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(+radius*0.1, +radius*0.2, radius*0.12, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  let gridLeft=0, gridTop=0;
+  function drawGame(t) {
+    calcGrid();
+    const totalW = cellSize * CONFIG.grid.cols;
+    const totalH = cellSize * CONFIG.grid.rows;
+    gridLeft = (W - totalW)/2;
+    gridTop = (H - totalH)/2 + 16;
+
+    ctx.fillStyle = CONFIG.theme.panel;
+    drawRoundedRect(gridLeft-16, gridTop-16, totalW+32, totalH+32, 18);
+    ctx.fill();
+
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    ctx.strokeStyle = CONFIG.theme.white;
+    ctx.lineWidth = 1;
+    for (let r=0;r<=CONFIG.grid.rows;r++) {
+      ctx.beginPath();
+      ctx.moveTo(gridLeft, gridTop + r*cellSize);
+      ctx.lineTo(gridLeft + totalW, gridTop + r*cellSize);
+      ctx.stroke();
+    }
+    for (let c=0;c<=CONFIG.grid.cols;c++) {
+      ctx.beginPath();
+      ctx.moveTo(gridLeft + c*cellSize, gridTop);
+      ctx.lineTo(gridLeft + c*cellSize, gridTop + totalH);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    const p = game.pizza;
+    const px = gridLeft + p.x*cellSize + cellSize/2;
+    const py = gridTop + p.y*cellSize + cellSize/2;
+    const pr = cellSize*0.42;
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(Math.sin(t*0.002 + (p.x+p.y)) * 0.25);
+    ctx.fillStyle = '#d69d6a';
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0,0,pr, -Math.PI/4, Math.PI/4, false);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = CONFIG.theme.accent3;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0,0,pr*0.8, -Math.PI/4, Math.PI/4, false);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = CONFIG.theme.accent;
+    for (let i=0;i<3;i++){
+      const ang = -0.35 + i*0.35;
+      ctx.beginPath(); ctx.arc(Math.cos(ang)*pr*0.45, Math.sin(ang)*pr*0.45, pr*0.12, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+
+    for (let i=game.body.length-1; i>=0; i--) {
+      drawMouseCell(game.body[i].x, game.body[i].y, i);
+    }
+
+    ctx.fillStyle = CONFIG.theme.white;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.font = '800 22px Nunito';
+    ctx.fillText(`Счёт: ${game.score}`, gridLeft, gridTop - 48);
+
+    ctx.font = '600 14px Nunito';
+    ctx.fillStyle = CONFIG.theme.muted;
+    ctx.fillText('Управление: ← ↑ → ↓   •   Пауза: P   •   Меню: Esc', gridLeft, gridTop - 24);
+
+    if (now() - game.lastStep >= CONFIG.grid.speedMs) {
+      game.lastStep = now();
+      gameStep();
+    }
+
+    if (!game.alive) {
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(0,0,W,H);
+      const ow = Math.min(420, W*0.9), oh = 240;
+      const ox = (W-ow)/2, oy=(H-oh)/2;
+      ctx.fillStyle = CONFIG.theme.panel;
+      drawRoundedRect(ox,oy,ow,oh,20); ctx.fill();
+      ctx.textAlign='center'; ctx.textBaseline='top';
+      ctx.fillStyle = CONFIG.theme.white;
+      ctx.font = '800 26px Nunito';
+      ctx.fillText('Игра окончена!', ox+ow/2, oy+18);
+      ctx.font = '600 18px Nunito';
+      ctx.fillStyle = CONFIG.theme.muted;
+      ctx.fillText(`Счёт: ${game.score}   •   Рекорд сегодня: ${state.daily[todayKey()].gameHighScore||0}`, ox+ow/2, oy+60);
+
+      const bRetry = {x: ox+40, y: oy+oh-70, w: (ow-120)/2, h: 50, label:'Играть снова', accent:true};
+      const bMenu = {x: ox+ow/2+20, y: oy+oh-70, w: (ow-120)/2, h: 50, label:'Меню', accent:false};
+      drawButton(bRetry); drawButton(bMenu);
+      if (buttonClicked(bRetry)) gameInit();
+      if (buttonClicked(bMenu)) goto(SCENES.MENU);
+    } else if (game.pause) {
+      ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0,0,W,H);
+      const ow = Math.min(480, W*0.9), oh = 280;
+      const ox = (W-ow)/2, oy=(H-oh)/2;
+      ctx.fillStyle = CONFIG.theme.panel;
+      drawRoundedRect(ox,oy,ow,oh,18); ctx.fill();
+      ctx.textAlign='center'; ctx.textBaseline='top';
+      ctx.fillStyle = CONFIG.theme.white;
+      ctx.font = '800 24px Nunito';
+      ctx.fillText('Пауза', ox+ow/2, oy+16);
+
+      const labels = [
+        {k:'speechRate', name:'Скорость речи', min:0.6, max:1.4, step:0.05},
+        {k:'speechPitch', name:'Высота', min:0.7, max:1.3, step:0.05},
+        {k:'speechVolume', name:'Громкость', min:0.2, max:1.0, step:0.1},
+      ];
+      let sy = oy + 64;
+      for (const s of labels) {
+        ctx.textAlign='left'; ctx.textBaseline='middle';
+        ctx.font='600 16px Nunito';
+        ctx.fillStyle=CONFIG.theme.muted;
+        ctx.fillText(s.name, ox+24, sy);
+
+        const btnW2 = 42, btnH2=36;
+        const minus = {x:ox+ow-24- btnW2*2 - 10 - 80, y:sy-18, w:btnW2, h:btnH2, label:'−', accent:false};
+        const plus  = {x:ox+ow-24- btnW2 - 80, y:sy-18, w:btnW2, h:btnH2, label:'+', accent:false};
+        const test  = {x:ox+ow-24- 80, y:sy-18, w:80, h:btnH2, label:'🔊 Тест', accent:false};
+
+        drawButton(minus); drawButton(plus); drawButton(test);
+
+        const val = state.settings[s.k];
+        ctx.textAlign='right'; ctx.font='700 18px Nunito'; ctx.fillStyle=CONFIG.theme.white;
+        ctx.fillText(val.toFixed(2).replace('.', ','), minus.x - 12, sy);
+
+        if (buttonClicked(minus)) {
+          state.settings[s.k] = Number((clamp(val - s.step, s.min, s.max)).toFixed(2));
+          saveState();
+        }
+        if (buttonClicked(plus)) {
+          state.settings[s.k] = Number((clamp(val + s.step, s.min, s.max)).toFixed(2));
+          saveState();
+        }
+        if (buttonClicked(test)) {
+          speak('pizza, pasta, gelato', {lang: CONFIG.voice.it});
+        }
+
+        sy += 56;
+      }
+
+      const bResume = {x: ox+40, y: oy+oh-64, w:(ow-120)/2, h:48, label:'Продолжить', accent:true};
+      const bMenu = {x: ox+ow/2+20, y: oy+oh-64, w:(ow-120)/2, h:48, label:'Меню', accent:false};
+      drawButton(bResume); drawButton(bMenu);
+      if (buttonClicked(bResume)) game.pause = false;
+      if (buttonClicked(bMenu)) goto(SCENES.MENU);
+    }
+  }
+
+  // ========= Toasts =========
+  const toasts = [];
+  function drawToasts() {
+    const tNow = now();
+    let y = H - 24;
+    for (let i=toasts.length-1; i>=0; i--) {
+      const toast = toasts[i];
+      const age = (tNow - toast.ts)/2000;
+      if (age > 1.2) { toasts.splice(i,1); continue; }
+      const a = 1 - easeOutCubic(clamp(age-0.1, 0, 1));
+      ctx.globalAlpha = a;
+      const text = toast.text;
+      ctx.font = '700 16px Nunito';
+      const tw = ctx.measureText(text).width + 28;
+      const th = 36;
+      const x = W - tw - 20;
+      y -= (th + 10);
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      drawRoundedRect(x, y, tw, th, 12); ctx.fill();
+      ctx.fillStyle = toast.color || CONFIG.theme.accent3;
+      ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillText(text, x+14, y+th/2);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // ========= Menu =========
+  function drawMenu() {
+    const pw = Math.min(820, W*0.92);
+    const ph = Math.min(520, H*0.72);
+    const px = (W - pw)/2, py = (H - ph)/2;
+    ctx.fillStyle = CONFIG.theme.panel;
+    drawRoundedRect(px, py, pw, ph, 24); ctx.fill();
+
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillStyle=CONFIG.theme.white;
+    ctx.font = '800 32px Nunito';
+    ctx.fillText('Добро пожаловать!', px+24, py+20);
+    ctx.font = '600 16px Nunito';
+    ctx.fillStyle = CONFIG.theme.muted;
+    ctx.fillText('Учите итальянские слова с карточками, викторинами и игрой «Мышка и пицца».', px+24, py+62);
+
+    const {streak, last7} = streakInfo();
+    const today = state.daily[todayKey()];
+    const xpToday = today ? today.xp : 0;
+
+    const statW = (pw - 24*2 - 20)/2;
+    const s1 = {x:px+24, y:py+100, w:statW, h:140};
+    const s2 = {x:px+24+statW+20, y:py+100, w:statW, h:140};
+
+    ctx.fillStyle = CONFIG.theme.panelStrong; drawRoundedRect(s1.x, s1.y, s1.w, s1.h, 16); ctx.fill();
+    ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillStyle=CONFIG.theme.muted; ctx.font='600 14px Nunito';
+    ctx.fillText('Серия дней', s1.x+16, s1.y+12);
+    ctx.fillStyle=CONFIG.theme.white; ctx.font='800 42px Nunito';
+    ctx.fillText(`${streak}`, s1.x+16, s1.y+44);
+
+    ctx.fillStyle = CONFIG.theme.panelStrong; drawRoundedRect(s2.x, s2.y, s2.w, s2.h, 16); ctx.fill();
+    ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillStyle=CONFIG.theme.muted; ctx.font='600 14px Nunito';
+    ctx.fillText('Опыт сегодня', s2.x+16, s2.y+12);
+    ctx.fillStyle=CONFIG.theme.white; ctx.font='800 42px Nunito';
+    ctx.fillText(`${xpToday}`, s2.x+16, s2.y+44);
+
+    const chart = {x:px+24, y:py+260, w:pw-48, h:120};
+    ctx.fillStyle = CONFIG.theme.panelStrong; drawRoundedRect(chart.x, chart.y, chart.w, chart.h, 16); ctx.fill();
+    ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillStyle=CONFIG.theme.muted; ctx.font='600 14px Nunito';
+    ctx.fillText('Прогресс за 7 дней (XP)', chart.x+16, chart.y+12);
+    const maxXP = Math.max(20, ...last7.map(d=>d.xp));
+    const barW = (chart.w - 32 - 6*10)/7;
+    for (let i=0;i<7;i++) {
+      const v = last7[i].xp;
+      const barH = (chart.h - 48) * (v/maxXP);
+      const bx = chart.x + 16 + i*(barW+10);
+      const by = chart.y + chart.h - 16 - barH;
+      ctx.fillStyle = i===6 ? CONFIG.theme.accent2 : CONFIG.theme.accent3;
+      drawRoundedRect(bx, by, barW, barH, 8); ctx.fill();
+    }
+
+    const btnW = Math.min(280, pw/3 - 20), btnH = 56;
+    const baseX = px+24, baseY = py + ph - 24 - btnH;
+    const bFlash = {x:baseX, y:baseY, w:btnW, h:btnH, label:'Карточки', icon:'🃏', accent:true};
+    const bQuiz  = {x:baseX + btnW + 16, y:baseY, w:btnW, h:btnH, label:'Викторина', icon:'❓', accent:false};
+    const bGame  = {x:baseX + (btnW + 16)*2, y:baseY, w:btnW, h:btnH, label:'Мышка и пицца', icon:'🧀', accent:false};
+
+    drawButton(bFlash); drawButton(bQuiz); drawButton(bGame);
+
+    if (buttonClicked(bFlash)) goto(SCENES.FLASH);
+    if (buttonClicked(bQuiz)) goto(SCENES.QUIZ);
+    if (buttonClicked(bGame)) goto(SCENES.GAME);
+
+    const bProg = {x:px+pw-150, y:py+20, w:130, h:40, label:'Прогресс', accent:false};
+    drawButton(bProg);
+    if (buttonClicked(bProg)) goto(SCENES.PROGRESS);
+  }
+
+  // ========= Progress Screen =========
+  function drawProgress() {
+    const pw = Math.min(880, W*0.92), ph = Math.min(600, H*0.78);
+    const px = (W-pw)/2, py=(H-ph)/2;
+
+    ctx.fillStyle = CONFIG.theme.panel;
+    drawRoundedRect(px,py,pw,ph,24); ctx.fill();
+
+    ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillStyle=CONFIG.theme.white; ctx.font='800 28px Nunito';
+    ctx.fillText('Ваш прогресс', px+24, py+18);
+
+    const d = state.daily[todayKey()] || {};
+    const items = [
+      {name:'Карточки', value:d.flashcardsReviewed||0, color:CONFIG.theme.accent3},
+      {name:'Викторина (верно)', value:`${d.quizCorrect||0}/${d.quizTotal||0}`, color:CONFIG.theme.accent2},
+      {name:'Пиццы съедено', value:d.pizzasEaten||0, color:CONFIG.theme.accent},
+      {name:'Рекорд (игра)', value:d.gameHighScore||0, color:'#7aa0ff'},
+      {name:'XP сегодня', value:d.xp||0, color:'#ff9f6e'},
+    ];
+
+    const iw = (pw-48), ih = 56;
+    let iy = py + 64;
+    for (const it of items) {
+      ctx.fillStyle = CONFIG.theme.panelStrong; drawRoundedRect(px+24, iy, iw, ih, 14); ctx.fill();
+      ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillStyle = CONFIG.theme.muted; ctx.font='600 16px Nunito';
+      ctx.fillText(it.name, px+40, iy+ih/2);
+      ctx.textAlign='right'; ctx.fillStyle=it.color; ctx.font='800 18px Nunito';
+      ctx.fillText(`${it.value}`, px+24+iw-16, iy+ih/2);
+      iy += ih + 12;
+    }
+
+    const mastered = Object.values(state.wordsProgress).filter(wp=>wp.mastered).length;
+    ctx.fillStyle = CONFIG.theme.panelStrong; const mw=iw; const mh=80;
+    drawRoundedRect(px+24, iy, mw, mh, 14); ctx.fill();
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillStyle=CONFIG.theme.muted; ctx.font='600 16px Nunito';
+    ctx.fillText('Слова на мастере:', px+40, iy+14);
+    ctx.fillStyle=CONFIG.theme.white; ctx.font='800 34px Nunito';
+    ctx.fillText(`${mastered}`, px+40, iy+40);
+
+    const bBack = {x:px+pw-140, y:py+ph-64, w:120, h:44, label:'Назад', accent:false};
+    drawButton(bBack); if (buttonClicked(bBack)) goto(SCENES.MENU);
+  }
+
+  // ========= Main Loop =========
+  let lastT = 0;
+  function loop(ts) {
+    const dt = ts - lastT; lastT = ts;
+    drawBackground(ts);
+
+    switch (currentScene) {
+      case SCENES.MENU: drawMenu(); break;
+      case SCENES.FLASH: drawFlash(); break;
+      case SCENES.QUIZ: drawQuiz(ts); break;
+      case SCENES.GAME: drawGame(ts); break;
+      case SCENES.PROGRESS: drawProgress(); break;
+    }
+
+    drawToasts();
+
+    input.justPressed = false;
+    input.justReleased = false;
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  setTimeout(()=>{
+    toasts.push({text:'Нажмите в любом месте, чтобы включить звук 🔊', ts: now(), color: CONFIG.theme.accent2});
+  }, 600);
+
+})();
+</script>
+</body>
+</html>
