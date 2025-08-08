@@ -3,464 +3,426 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#9cd8ff">
-<title>Азбука — играем и говорим</title>
+<meta name="theme-color" content="#7cc0ff">
+<title>Русская азбука — учимся играя</title>
 <style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; width: 100%; margin: 0; padding: 0; overflow: hidden; -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
   :root {
-    --pad: 12px;
     --gap: 10px;
-    --cell-size: 100px;
+    --padding: 14px;
+    --cell-size: 110px;
+    --cols: 6;
     --radius: 16px;
-    --shadow: 0 6px 16px rgba(0,0,0,0.15);
-    --shadow-hover: 0 10px 24px rgba(0,0,0,0.18);
-    --focus: #1e88e5;
-    --bg1: #f2fbff;
-    --bg2: #fef6ff;
+    --shadow: 0 4px 10px rgba(0,0,0,0.12);
+    --shadow-hover: 0 8px 18px rgba(0,0,0,0.18);
+    --focus: 2px solid #1e88e5;
+    --bg1: #e3f2fd;
+    --bg2: #fce4ec;
+    --anim: 160ms ease;
+    --text: #16324f;
   }
-  * { box-sizing: border-box; }
-  html, body {
-    margin: 0;
-    height: 100%;
-    overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-    color: #1b1b1b;
-    background: radial-gradient(1200px 800px at 20% 10%, var(--bg1), transparent 70%),
-                radial-gradient(1000px 700px at 80% 90%, var(--bg2), transparent 70%),
-                linear-gradient(180deg, #e9f7ff 0%, #fff5fb 100%);
+  body {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    color: var(--text);
+    background: linear-gradient(140deg, #e1f5fe 0%, #f8e9ff 50%, #e0ffe7 100%);
   }
-  .app {
-    width: 100vw;
-    height: 100vh;
-    height: 100svh;
+  .wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 100svw;
     height: 100dvh;
-    padding: env(safe-area-inset-top) env(safe-area-inset-right)
-             env(safe-area-inset-bottom) env(safe-area-inset-left);
+    height: 100svh;
+    height: 100vh;
+    padding-top: calc(var(--padding) + env(safe-area-inset-top));
+    padding-right: calc(var(--padding) + env(safe-area-inset-right));
+    padding-bottom: calc(var(--padding) + env(safe-area-inset-bottom));
+    padding-left: calc(var(--padding) + env(safe-area-inset-left));
     display: grid;
     place-items: center;
-  }
-  .grid-wrap {
-    width: 100%;
-    height: 100%;
-    padding: var(--pad);
-    display: grid;
+    touch-action: manipulation;
   }
   .grid {
     width: 100%;
     height: 100%;
+    max-width: 100%;
+    max-height: 100%;
     display: grid;
-    grid-template-columns: repeat(6, var(--cell-size));
+    grid-template-columns: repeat(var(--cols), minmax(0, var(--cell-size)));
     grid-auto-rows: var(--cell-size);
     gap: var(--gap);
-    justify-content: center;
-    align-content: center;
-    touch-action: manipulation;
   }
-  .tile {
-    background: #ffffff;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
+
+  .card {
+    min-width: 0;
+    min-height: 0;
+    overflow: clip;
+    aspect-ratio: 1 / 1;
     display: grid;
     place-items: center;
-    user-select: none;
-    cursor: pointer;
-    transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
-    outline: none;
-    aspect-ratio: 1 / 1;
-  }
-  .tile:focus-visible {
-    box-shadow: 0 0 0 4px rgba(30,136,229,0.25), var(--shadow-hover);
-  }
-  .tile:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: var(--shadow-hover);
-  }
-  .tile:active {
-    transform: translateY(0) scale(0.98);
+    border-radius: var(--radius);
     box-shadow: var(--shadow);
-    filter: brightness(0.98);
+    background: var(--bg1);
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform var(--anim), box-shadow var(--anim), background-color var(--anim);
+    outline: none;
+    touch-action: manipulation;
   }
-  .tile-content {
-    width: 90%;
-    height: 90%;
+  .card:hover { transform: translateZ(0) scale(1.02); box-shadow: var(--shadow-hover); }
+  .card:active { transform: translateZ(0) scale(0.98); box-shadow: var(--shadow); }
+  .card:focus-visible { outline: var(--focus); outline-offset: 2px; }
+
+  .inner {
+    width: 100%;
+    height: 100%;
     display: grid;
     grid-template-columns: 1fr 1fr;
     align-items: center;
     justify-items: center;
-    gap: clamp(4px, calc(var(--cell-size) * 0.06), 16px);
+    gap: clamp(4px, calc(var(--cell-size) * 0.06), 14px);
+    padding: clamp(6px, calc(var(--cell-size) * 0.10), 18px);
   }
   .letter {
     font-weight: 800;
+    font-size: clamp(18px, calc(var(--cell-size) * 0.42), 120px);
     line-height: 1;
-    font-size: clamp(28px, calc(var(--cell-size) * 0.52), 100px);
   }
   .emoji {
-    font-size: clamp(24px, calc(var(--cell-size) * 0.42), 72px);
+    font-size: clamp(16px, calc(var(--cell-size) * 0.35), 96px);
+    line-height: 1;
   }
-  @media (max-width: 430px) {
-    .tile-content {
-      grid-template-columns: 1fr;
-      grid-template-rows: 1fr 1fr;
-      gap: clamp(2px, calc(var(--cell-size) * 0.04), 10px);
-    }
-    .letter {
-      font-size: clamp(26px, calc(var(--cell-size) * 0.48), 84px);
-    }
-    .emoji {
-      font-size: clamp(22px, calc(var(--cell-size) * 0.4), 64px);
-    }
+  .stacked .inner { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+
+  .label {
+    position: absolute;
+    inset: auto 8px 8px 8px;
+    text-align: center;
+    font-size: clamp(10px, 2.6vw, 14px);
+    opacity: 0.85;
+    color: var(--text);
+    pointer-events: none;
   }
-  .compact .tile-content {
-    gap: clamp(2px, calc(var(--cell-size) * 0.04), 10px);
-  }
-  .compact .letter {
-    font-size: clamp(24px, calc(var(--cell-size) * 0.48), 90px);
-  }
-  .compact .emoji {
-    font-size: clamp(20px, calc(var(--cell-size) * 0.36), 60px);
-  }
+
+  .wrapper.compact { --gap: 6px; --padding: 8px; --radius: 12px; }
+  .wrapper.compact .letter { font-size: clamp(16px, calc(var(--cell-size) * 0.38), 110px); }
+  .wrapper.compact .emoji  { font-size: clamp(14px, calc(var(--cell-size) * 0.32), 88px); }
 
   .overlay {
     position: fixed;
     inset: 0;
-    z-index: 10;
-    background: rgba(255,255,255,0.82);
-    backdrop-filter: blur(8px);
+    background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(240,248,255,0.92));
     display: grid;
     place-items: center;
-    padding: 24px;
+    z-index: 9999;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
   }
-  .overlay.hide {
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 200ms ease;
-  }
-  .overlay-card {
-    background: linear-gradient(180deg, #ffffffbf, #ffffffa8);
-    border-radius: 20px;
-    box-shadow: 0 12px 32px rgba(0,0,0,0.18);
-    padding: 28px 24px;
-    max-width: 520px;
+  .overlay .overlay-box {
+    background: white;
+    border-radius: 18px;
+    padding: 24px 28px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
     text-align: center;
-    color: #10324a;
+    max-width: 80%;
   }
-  .overlay-emoji {
-    font-size: 48px;
-    margin-bottom: 12px;
-  }
-  .overlay-title {
-    font-size: 20px;
-    font-weight: 800;
-    margin-bottom: 6px;
-  }
-  .overlay-sub {
-    font-size: 14px;
-    opacity: 0.8;
-  }
+  .overlay h1 { margin: 0 0 8px 0; font-size: 20px; }
+  .overlay p { margin: 0; opacity: 0.8; font-size: 14px; }
+  .overlay[hidden] { display: none; }
 
-  .sr-only {
-    position: absolute;
-    width: 1px; height: 1px;
-    padding: 0; margin: -1px;
-    overflow: hidden; clip: rect(0,0,0,0);
-    white-space: nowrap; border: 0;
+  @media (prefers-reduced-motion: reduce) {
+    .card { transition: none; }
+    .card:hover, .card:active { transform: none; }
   }
 </style>
 </head>
 <body>
-<div class="app">
-  <div class="grid-wrap">
-    <div id="grid" class="grid" role="grid" aria-label="Азбука"></div>
+<div class="overlay" id="overlay" role="button" aria-label="Нажмите, чтобы включить звук" tabindex="0">
+  <div class="overlay-box">
+    <h1>Нажмите, чтобы включить звук</h1>
+    <p>Это нужно, чтобы включить озвучивание букв на вашем устройстве.</p>
   </div>
 </div>
 
-<div id="audioOverlay" class="overlay" role="dialog" aria-modal="true" aria-label="Включение звука">
-  <div class="overlay-card" role="button" tabindex="0" aria-label="Нажмите, чтобы включить звук">
-    <div class="overlay-emoji">🔊</div>
-    <div class="overlay-title">Нажмите, чтобы включить звук</div>
-    <div class="overlay-sub">Затем коснитесь буквы, чтобы услышать фразу</div>
-  </div>
+<div class="wrapper" id="wrapper" role="grid" aria-label="Русская азбука">
+  <div class="grid" id="grid"></div>
 </div>
 
 <script>
-  const DATA = [
-    {l:'А', w:'арбуз', e:'🍉', p:'А — арбуз'},
-    {l:'Б', w:'барабан', e:'🥁', p:'Б — барабан'},
-    {l:'В', w:'велосипед', e:'🚲', p:'В — велосипед'},
-    {l:'Г', w:'груша', e:'🍐', p:'Г — груша'},
-    {l:'Д', w:'дом', e:'🏠', p:'Д — дом'},
-    {l:'Е', w:'енот', e:'🦝', p:'Е — енот'},
-    {l:'Ё', w:'ёлка', e:'🎄', p:'Ё — ёлка'},
-    {l:'Ж', w:'жираф', e:'🦒', p:'Ж — жираф'},
-    {l:'З', w:'заяц', e:'🐰', p:'З — заяц'},
-    {l:'И', w:'игра', e:'🎮', p:'И — игра'},
-    {l:'Й', w:'йога', e:'🧘', p:'Й — йога'},
-    {l:'К', w:'кот', e:'🐱', p:'К — кот'},
-    {l:'Л', w:'лиса', e:'🦊', p:'Л — лиса'},
-    {l:'М', w:'мяч', e:'⚽', p:'М — мяч'},
-    {l:'Н', w:'носорог', e:'🦏', p:'Н — носорог'},
-    {l:'О', w:'осьминог', e:'🐙', p:'О — осьминог'},
-    {l:'П', w:'поезд', e:'🚂', p:'П — поезд'},
-    {l:'Р', w:'ракета', e:'🚀', p:'Р — ракета'},
-    {l:'С', w:'солнце', e:'☀️', p:'С — солнце'},
-    {l:'Т', w:'тигр', e:'🐯', p:'Т — тигр'},
-    {l:'У', w:'утка', e:'🦆', p:'У — утка'},
-    {l:'Ф', w:'фламинго', e:'🦩', p:'Ф — фламинго'},
-    {l:'Х', w:'хомяк', e:'🐹', p:'Х — хомяк'},
-    {l:'Ц', w:'цирк', e:'🎪', p:'Ц — цирк'},
-    {l:'Ч', w:'чайник', e:'🫖', p:'Ч — чайник'},
-    {l:'Ш', w:'шарик', e:'🎈', p:'Ш — шарик'},
-    {l:'Щ', w:'щётка', e:'🪥', p:'Щ — щётка'},
-    {l:'Ъ', w:'твёрдый знак', e:'🧱', p:'Ъ — твёрдый знак'},
-    {l:'Ы', w:'буква ы', e:'🙂', p:'Ы — буква ы'},
-    {l:'Ь', w:'мягкий знак', e:'🧸', p:'Ь — мягкий знак'},
-    {l:'Э', w:'эскимо', e:'🍦', p:'Э — эскимо'},
-    {l:'Ю', w:'юбка', e:'👗', p:'Ю — юбка'},
-    {l:'Я', w:'ягода', e:'🍓', p:'Я — ягода'}
-  ];
+  (function () {
+    const items = [
+      { l: 'А', w: 'арбуз',    e: '🍉', phrase: 'А — арбуз' },
+      { l: 'Б', w: 'барабан',  e: '🥁', phrase: 'Б — барабан' },
+      { l: 'В', w: 'велосипед',e: '🚲', phrase: 'В — велосипед' },
+      { l: 'Г', w: 'груша',    e: '🍐', phrase: 'Г — груша' },
+      { l: 'Д', w: 'дом',      e: '🏠', phrase: 'Д — дом' },
+      { l: 'Е', w: 'енот',     e: '🦝', phrase: 'Е — енот' },
+      { l: 'Ё', w: 'ёлка',     e: '🎄', phrase: 'Ё — ёлка' },
+      { l: 'Ж', w: 'жираф',    e: '🦒', phrase: 'Ж — жираф' },
+      { l: 'З', w: 'заяц',     e: '🐰', phrase: 'З — заяц' },
+      { l: 'И', w: 'игра',     e: '🎮', phrase: 'И — игра' },
+      { l: 'Й', w: 'йога',     e: '🧘', phrase: 'Й — йога' },
+      { l: 'К', w: 'кот',      e: '🐱', phrase: 'К — кот' },
+      { l: 'Л', w: 'лиса',     e: '🦊', phrase: 'Л — лиса' },
+      { l: 'М', w: 'мяч',      e: '⚽', phrase: 'М — мяч' },
+      { l: 'Н', w: 'носорог',  e: '🦏', phrase: 'Н — носорог' },
+      { l: 'О', w: 'осьминог', e: '🐙', phrase: 'О — осьминог' },
+      { l: 'П', w: 'поезд',    e: '🚂', phrase: 'П — поезд' },
+      { l: 'Р', w: 'ракета',   e: '🚀', phrase: 'Р — ракета' },
+      { l: 'С', w: 'солнце',   e: '☀️', phrase: 'С — солнце' },
+      { l: 'Т', w: 'тигр',     e: '🐯', phrase: 'Т — тигр' },
+      { l: 'У', w: 'утка',     e: '🦆', phrase: 'У — утка' },
+      { l: 'Ф', w: 'фламинго', e: '🦩', phrase: 'Ф — фламинго' },
+      { l: 'Х', w: 'хомяк',    e: '🐹', phrase: 'Х — хомяк' },
+      { l: 'Ц', w: 'цирк',     e: '🎪', phrase: 'Ц — цирк' },
+      { l: 'Ч', w: 'чайник',   e: '🫖', phrase: 'Ч — чайник' },
+      { l: 'Ш', w: 'шарик',    e: '🎈', phrase: 'Ш — шарик' },
+      { l: 'Щ', w: 'щётка',    e: '🪥', phrase: 'Щ — щётка' },
+      { l: 'Ъ', w: 'твёрдый знак', e: '🧱', phrase: 'Ъ — твёрдый знак' },
+      { l: 'Ы', w: 'буква ы',  e: '🙂', phrase: 'Ы — буква ы' },
+      { l: 'Ь', w: 'мягкий знак', e: '🧸', phrase: 'Ь — мягкий знак' },
+      { l: 'Э', w: 'эскимо',   e: '🍦', phrase: 'Э — эскимо' },
+      { l: 'Ю', w: 'юбка',     e: '👗', phrase: 'Ю — юбка' },
+      { l: 'Я', w: 'ягода',    e: '🍓', phrase: 'Я — ягода' }
+    ];
 
-  const PALETTE = [
-    '#FFECB3','#C8E6C9','#BBDEFB','#FFCDD2','#FFE0B2','#D1C4E9',
-    '#B2EBF2','#F8BBD0','#DCEDC8','#FFF9C4','#E1BEE7','#B3E5FC'
-  ];
+    const palette = [
+      '#FFCDD2','#F8BBD0','#E1BEE7','#D1C4E9','#C5CAE9','#BBDEFB','#B3E5FC',
+      '#B2EBF2','#B2DFDB','#C8E6C9','#DCEDC8','#F0F4C3','#FFF9C4','#FFECB3',
+      '#FFE0B2','#FFCCBC','#D7CCC8','#CFD8DC'
+    ];
 
-  const app = document.querySelector('.app');
-  const gridWrap = document.querySelector('.grid-wrap');
-  const grid = document.getElementById('grid');
-  const overlay = document.getElementById('audioOverlay');
+    const wrapper = document.getElementById('wrapper');
+    const grid = document.getElementById('grid');
+    const overlay = document.getElementById('overlay');
 
-  let audioEnabled = false;
-  let currentCols = 6;
+    let audioEnabled = false;
+    let currentCols = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cols')) || 6;
+    let selectedVoice = null;
 
-  function buildGrid() {
-    const frag = document.createDocumentFragment();
-    DATA.forEach((item, idx) => {
-      const tile = document.createElement('div');
-      tile.className = 'tile';
-      tile.setAttribute('role','button');
-      tile.setAttribute('tabindex','0');
-      tile.setAttribute('aria-label', item.p);
-      tile.dataset.index = String(idx);
-      tile.dataset.phrase = item.p;
-      tile.style.background = PALETTE[idx % PALETTE.length];
+    function buildGrid() {
+      const frag = document.createDocumentFragment();
+      items.forEach((it, idx) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', '0');
+        card.setAttribute('aria-label', it.phrase);
+        card.dataset.index = String(idx);
+        card.style.background = palette[idx % palette.length];
 
-      const c = document.createElement('div');
-      c.className = 'tile-content';
-      const letter = document.createElement('div');
-      letter.className = 'letter';
-      letter.textContent = item.l;
-      const emoji = document.createElement('div');
-      emoji.className = 'emoji';
-      emoji.setAttribute('aria-hidden','true');
-      emoji.textContent = item.e;
-      c.appendChild(letter);
-      c.appendChild(emoji);
+        const inner = document.createElement('div');
+        inner.className = 'inner';
 
-      tile.appendChild(c);
-      tile.addEventListener('click', () => activateTile(tile));
-      tile.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          activateTile(tile);
-        } else if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key)) {
-          e.preventDefault();
-          handleArrows(e.key, parseInt(tile.dataset.index, 10));
-        }
+        const letter = document.createElement('div');
+        letter.className = 'letter';
+        letter.textContent = it.l;
+
+        const emoji = document.createElement('div');
+        emoji.className = 'emoji';
+        emoji.textContent = it.e;
+
+        inner.appendChild(letter);
+        inner.appendChild(emoji);
+        card.appendChild(inner);
+
+        card.addEventListener('click', () => speak(it.phrase));
+        card.addEventListener('keydown', (e) => {
+          const key = e.key;
+          if (key === 'Enter' || key === ' ') {
+            e.preventDefault();
+            speak(it.phrase);
+            return;
+          }
+          const idx = Number(card.dataset.index);
+          let targetIndex = null;
+          if (key === 'ArrowLeft') targetIndex = idx - 1;
+          else if (key === 'ArrowRight') targetIndex = idx + 1;
+          else if (key === 'ArrowUp') targetIndex = idx - currentCols;
+          else if (key === 'ArrowDown') targetIndex = idx + currentCols;
+          if (targetIndex !== null) {
+            e.preventDefault();
+            if (targetIndex >= 0 && targetIndex < items.length) {
+              const target = grid.querySelector(`.card[data-index="${targetIndex}"]`);
+              target && target.focus();
+            }
+          }
+        });
+
+        frag.appendChild(card);
       });
-      frag.appendChild(tile);
-    });
-    grid.appendChild(frag);
-  }
-
-  function handleArrows(key, index) {
-    const count = DATA.length;
-    const cols = currentCols || 6;
-    const rows = Math.ceil(count / cols);
-    let target = index;
-    const col = index % cols;
-    const row = Math.floor(index / cols);
-
-    if (key === 'ArrowRight') {
-      if (col < cols - 1 && index + 1 < count) target = index + 1;
-      else {
-        const start = row * cols;
-        const end = Math.min(start + cols - 1, count - 1);
-        target = start;
-        if (target > end) target = end;
-      }
-    } else if (key === 'ArrowLeft') {
-      if (col > 0) target = index - 1;
-      else {
-        const start = row * cols;
-        const end = Math.min(start + cols - 1, count - 1);
-        target = end;
-      }
-    } else if (key === 'ArrowDown') {
-      let nr = Math.min(row + 1, rows - 1);
-      target = nr * cols + col;
-      if (target >= count) target = count - 1;
-    } else if (key === 'ArrowUp') {
-      let nr = Math.max(row - 1, 0);
-      target = nr * cols + col;
-      if (target >= count) target = count - 1;
-    } else if (key === 'Home' || key === 'PageUp') {
-      target = 0;
-    } else if (key === 'End' || key === 'PageDown') {
-      target = count - 1;
+      grid.appendChild(frag);
     }
-    const el = grid.children[target];
-    if (el) el.focus();
-  }
 
-  const synth = window.speechSynthesis;
-  let selectedVoice = null;
+    function debounce(fn, delay) {
+      let t;
+      return (...args) => {
+        clearTimeout(t);
+        t = setTimeout(() => fn.apply(null, args), delay);
+      };
+    }
 
-  function pickVoice() {
-    const voices = synth.getVoices();
-    if (!voices || voices.length === 0) return null;
-    let v = voices.find(v => v.lang && /^(ru[-_]?RU)$/i.test(v.lang));
-    if (!v) v = voices.find(v => v.lang && /^ru/i.test(v.lang));
-    if (!v) v = voices.find(v => v.lang && /ru/i.test(v.lang));
-    if (!v) v = voices[0];
-    return v || null;
-  }
+    function getViewportSize() {
+      const vv = window.visualViewport;
+      if (vv) return { w: Math.floor(vv.width), h: Math.floor(vv.height) };
+      const de = document.documentElement;
+      return { w: Math.floor(de.clientWidth), h: Math.floor(de.clientHeight) };
+    }
 
-  function refreshVoice() {
-    selectedVoice = pickVoice();
-  }
+    function px(n) { return `${Math.max(0, Math.floor(n))}px`; }
 
-  function speak(text) {
-    if (!audioEnabled || !text) return;
-    try {
-      synth.cancel();
-    } catch(e) {}
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ru-RU';
-    if (!selectedVoice) refreshVoice();
-    if (selectedVoice) u.voice = selectedVoice;
-    u.rate = 0.95;
-    u.pitch = 1.0;
-    u.volume = 1.0;
-    requestAnimationFrame(() => {
-      try { synth.speak(u); } catch(e) {}
-    });
-  }
+    function fitGrid() {
+      const { w: vw, h: vh } = getViewportSize();
+      const csGrid = getComputedStyle(grid);
+      const csWrap = getComputedStyle(wrapper);
+      const gap = parseFloat(csGrid.getPropertyValue('--gap')) || parseFloat(csGrid.gap) || 0;
+      const padL = parseFloat(csWrap.paddingLeft) || 0;
+      const padR = parseFloat(csWrap.paddingRight) || 0;
+      const padT = parseFloat(csWrap.paddingTop) || 0;
+      const padB = parseFloat(csWrap.paddingBottom) || 0;
 
-  function activateTile(tile) {
-    const phrase = tile.dataset.phrase;
-    speak(phrase);
-  }
+      const portrait = vh >= vw;
+      const range = portrait ? [3, 6] : [5, 10];
 
-  function computeLayout() {
-    const wrapStyles = getComputedStyle(gridWrap);
-    let pad = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--pad')) || 12;
-    let gap = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--gap')) || 10;
+      let best = null;
 
-    const vw = gridWrap.clientWidth;
-    const vh = gridWrap.clientHeight;
-
-    let best = null;
-
-    function tryRange(minCols, maxCols, padVal, gapVal) {
-      for (let cols = minCols; cols <= maxCols; cols++) {
-        const cellSize = Math.floor((vw - (cols + 1) * gapVal - 2 * padVal) / cols);
-        if (cellSize <= 0) continue;
-        const rows = Math.ceil(DATA.length / cols);
-        const totalHeight = rows * cellSize + (rows + 1) * gapVal + 2 * padVal;
+      for (let cols = range[0]; cols <= range[1]; cols++) {
+        const rows = Math.ceil(items.length / cols);
+        const cellByWidth = Math.floor((vw - (cols - 1) * gap - (padL + padR)) / cols);
+        const totalHeight = rows * cellByWidth + (rows - 1) * gap + (padT + padB);
+        if (cellByWidth <= 0) continue;
         if (totalHeight <= vh) {
-          if (!best || cellSize > best.cellSize) {
-            best = { cols, cellSize, pad: padVal, gap: gapVal };
+          if (!best || cellByWidth > best.cell) {
+            best = { cols, cell: cellByWidth, rows };
           }
         }
       }
+
+      const hadCompact = wrapper.classList.contains('compact');
+      if (!best) {
+        if (!hadCompact) {
+          wrapper.classList.add('compact');
+          return fitGrid();
+        } else {
+          // fallback: pick the largest cell that fits width with max cols in range
+          let fallback = null;
+          for (let cols = range[0]; cols <= range[1]; cols++) {
+            const cellByWidth = Math.floor((vw - (cols - 1) * gap - (padL + padR)) / cols);
+            if (cellByWidth <= 0) continue;
+            if (!fallback || cellByWidth > fallback.cell) fallback = { cols, cell: cellByWidth };
+          }
+          best = fallback || { cols: portrait ? range[0] : range[1], cell: 64 };
+        }
+      } else {
+        if (hadCompact) {
+          wrapper.classList.remove('compact');
+          // Re-evaluate with non-compact spacings
+          return fitGrid();
+        }
+      }
+
+      currentCols = best.cols;
+      document.documentElement.style.setProperty('--cols', String(best.cols));
+      document.documentElement.style.setProperty('--cell-size', px(best.cell));
+
+      requestAnimationFrame(() => postFitAdjust());
+      adjustStacking(best.cell);
     }
 
-    tryRange(3, 10, 12, 10);
-    if (!best) {
-      gridWrap.classList.add('compact');
-      tryRange(3, 10, 8, 6);
-    } else {
-      gridWrap.classList.remove('compact');
+    function postFitAdjust() {
+      const maxIterations = 400;
+      let iterations = 0;
+
+      function step() {
+        const overflowX = wrapper.scrollWidth > wrapper.clientWidth;
+        const overflowY = wrapper.scrollHeight > wrapper.clientHeight;
+        if (!overflowX && !overflowY) return;
+        const current = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cell-size')) || 100;
+        const next = Math.max(1, Math.floor(current - 2));
+        if (next === current || iterations++ > maxIterations) return;
+        document.documentElement.style.setProperty('--cell-size', px(next));
+        adjustStacking(next);
+        requestAnimationFrame(step);
+      }
+      step();
     }
-    if (!best) {
-      tryRange(3, 12, 6, 4);
+
+    function adjustStacking(cell) {
+      const stacked = cell < 96;
+      grid.classList.toggle('stacked', stacked);
     }
 
-    if (!best) {
-      const cols = 10;
-      const cellSize = Math.floor((vw - (cols + 1) * 4 - 2 * 6) / cols);
-      best = { cols, cellSize: Math.max(cellSize, 32), pad: 6, gap: 4 };
+    function chooseVoice() {
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices || !voices.length) return null;
+      const byExact = voices.find(v => (v.lang || '').toLowerCase() === 'ru-ru');
+      if (byExact) return byExact;
+      const byRu = voices.find(v => (v.lang || '').toLowerCase().startsWith('ru'));
+      if (byRu) return byRu;
+      const similar = voices.find(v => /(uk|be|bg|sr)/i.test(v.lang || ''));
+      return similar || voices[0];
     }
 
-    currentCols = best.cols;
-    document.documentElement.style.setProperty('--pad', best.pad + 'px');
-    document.documentElement.style.setProperty('--gap', best.gap + 'px');
-    document.documentElement.style.setProperty('--cell-size', best.cellSize + 'px');
-    grid.style.gridTemplateColumns = `repeat(${best.cols}, var(--cell-size))`;
-  }
+    function primeSpeech() {
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(' ');
+        u.volume = 0;
+        u.rate = 1;
+        u.pitch = 1;
+        u.lang = 'ru-RU';
+        const v = chooseVoice();
+        if (v) u.voice = v;
+        window.speechSynthesis.speak(u);
+      } catch (e) {}
+    }
 
-  function debounce(fn, wait = 120) {
-    let t;
-    return (...args) => {
-      clearTimeout(t);
-      t = setTimeout(() => fn.apply(null, args), wait);
-    };
-  }
+    function speak(text) {
+      if (!audioEnabled) return;
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = 0.95;
+        u.pitch = 1.0;
+        u.lang = 'ru-RU';
+        if (!selectedVoice) selectedVoice = chooseVoice();
+        if (selectedVoice) u.voice = selectedVoice;
+        window.speechSynthesis.speak(u);
+      } catch (e) {}
+    }
 
-  function enableAudioFromEvent(ev) {
-    if (audioEnabled) return;
-    audioEnabled = true;
-    const x = ev.touches && ev.touches[0] ? ev.touches[0].clientX : ev.clientX;
-    const y = ev.touches && ev.touches[0] ? ev.touches[0].clientY : ev.clientY;
+    function enableAudio() {
+      audioEnabled = true;
+      selectedVoice = chooseVoice();
+      primeSpeech();
+      overlay.setAttribute('hidden', '');
+      setTimeout(() => {
+        // focus first card for accessibility
+        const first = grid.querySelector('.card');
+        first && first.focus();
+      }, 0);
+    }
 
-    overlay.classList.add('hide');
-    overlay.style.pointerEvents = 'none';
-
-    requestAnimationFrame(() => {
-      const el = document.elementFromPoint(x, y);
-      const tile = el && (el.classList.contains('tile') ? el : el.closest && el.closest('.tile'));
-      if (tile) {
-        setTimeout(() => {
-          tile.click();
-        }, 0);
+    overlay.addEventListener('click', enableAudio);
+    overlay.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        enableAudio();
       }
     });
-  }
 
-  function setupOverlay() {
-    const card = overlay.querySelector('.overlay-card');
-    const anyActivate = (e) => {
-      e.preventDefault();
-      enableAudioFromEvent(e);
-    };
-    overlay.addEventListener('pointerdown', anyActivate, { passive: false });
-    card.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        anyActivate(e);
-      }
-    }, { passive: false });
-  }
+    window.speechSynthesis.addEventListener('voiceschanged', () => {
+      selectedVoice = chooseVoice();
+    });
 
-  function init() {
     buildGrid();
-    computeLayout();
-    refreshVoice();
-    if (typeof window.speechSynthesis !== 'undefined') {
-      window.speechSynthesis.onvoiceschanged = () => {
-        refreshVoice();
-      };
-    }
-  }
-
-  const onResize = debounce(() => computeLayout(), 120);
-
-  window.addEventListener('resize', onResize);
-  window.addEventListener('orientationchange', () => setTimeout(() => computeLayout(), 50));
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', onResize);
-  }
-
-  setupOverlay();
-  document.addEventListener('DOMContentLoaded', init);
+    const onResize = debounce(fitGrid, 50);
+    window.addEventListener('load', fitGrid, { passive: true });
+    window.addEventListener('resize', onResize, { passive: true });
+    window.addEventListener('orientationchange', onResize, { passive: true });
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize, { passive: true });
+  })();
 </script>
 </body>
 </html>
